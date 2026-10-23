@@ -316,3 +316,13 @@ input.rename{width:100%;min-height:40px;padding:0 10px;border-radius:10px;border
   .bond.complete{background:#071517}
   .picker-search{background:var(--bg-1)}
 }
+
+/* Recruitment steps */
+.steps{margin:2px 0 0;padding:0;list-style:none;counter-reset:step;display:grid;gap:8px}
+.steps li{position:relative;padding-left:34px;line-height:1.45;counter-increment:step}
+.steps li::before{content:counter(step);position:absolute;left:0;top:-1px;display:grid;place-items:center;width:24px;height:24px;transform:rotate(45deg);border-radius:6px;
+  background:rgba(226,194,122,.14);border:1px solid var(--line-2);font:700 12px/1 var(--caps);color:var(--gold-hi)}
+.steps li::before{transform:none;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);border:0;background:var(--gold-grad);color:#1b1306;width:26px;height:26px;left:-1px;top:-3px}
+.steps li.step-base{color:var(--muted)}
+.steps li.step-base b{color:var(--ivory);font:700 17px/1 var(--display)}
+#supports-toolbar{row-gap:4px}

@@ -13,9 +13,10 @@
 <title>Field Guide · Fortune’s Weave</title>
 <link rel="preload" href="fonts/cinzel-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/cormorant-garamond-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=21">
-<link rel="stylesheet" href="missables.css?v=21">
-<link rel="stylesheet" href="v2.css?v=23">
+<link rel="stylesheet" href="style.css?v=30">
+<link rel="stylesheet" href="missables.css?v=30">
+<link rel="stylesheet" href="v2.css?v=31">
+<link rel="stylesheet" href="fx.css?v=30">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -68,11 +69,12 @@
     <button class="save-chip" id="save-chip" type="button" aria-haspopup="dialog" aria-controls="files">
       <span class="save-face"><img id="save-chip-face" src="portraits/theodora.webp" alt="" width="34" height="34"></span>
       <span class="save-text"><small>Save file</small><b id="save-chip-name">Theodora’s journey</b></span>
-      <span class="save-state" id="save-state"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg><span>Saved</span></span>
+      <span class="save-state bad" id="save-state" hidden><svg class="ico" aria-hidden="true"><use href="#i-close"/></svg><span>Not saved</span></span>
     </button>
     <div class="hero-copy">
       <p class="eyebrow"><span class="eyebrow-gem" aria-hidden="true"></span>Fire Emblem · Fortune’s Weave</p>
       <h1 id="hero-title" tabindex="-1"><span class="h1-small" id="hero-lord">Theodora’s</span><span class="h1-big">Field Guide</span></h1>
+      <span class="weave-slot" data-weave aria-hidden="true"></span>
       <p class="subtitle">A little preparation. A stronger company.</p>
       <div class="hero-stats" id="hero-stats">
         <button class="stat" type="button" data-jump="joinable" aria-label="Show everyone who can join"><b id="stat-recruitable">—</b><span>Can join</span></button>
@@ -121,6 +123,7 @@
     <div class="ph-copy">
       <p class="eyebrow"><span class="eyebrow-gem" aria-hidden="true"></span>Support conversations</p>
       <h1 id="supports-heading" tabindex="-1">Bonds</h1>
+      <span class="weave-slot" data-weave aria-hidden="true"></span>
       <button class="focus-pick" id="sp-focus" type="button" aria-haspopup="dialog">
         <span class="pf sm"><img id="sp-focus-face" src="" alt=""></span>
         <span class="fp-text"><small>Showing bonds of</small><b id="sp-focus-name">—</b></span>
@@ -132,6 +135,8 @@
       </div>
     </div>
   </header>
+  <div class="cast-wrap"><div class="cast-head"><b>Everyone with bonds</b><small id="sp-cast-count"></small></div>
+    <div class="cast-strip" id="sp-cast" role="group" aria-label="Choose whose bonds to show"></div></div>
   <p class="note hint"><svg class="ico" aria-hidden="true"><use href="#i-spark"/></svg>Tap a rank once you’ve watched it. Tap a name for what it needs.</p>
   <div class="toolbar slim" id="supports-toolbar">
     <div id="sp-filter" class="segmented wide" role="group" aria-label="Show">
@@ -140,6 +145,7 @@
       <button type="button" data-filter="done" aria-pressed="false">Viewed</button>
     </div>
     <label class="switch"><input type="checkbox" id="sp-company-only"><span class="sw" aria-hidden="true"></span>In my company</label>
+    <label class="switch"><input type="checkbox" id="sp-part1"><span class="sw" aria-hidden="true"></span>Part I only</label>
   </div>
   <div id="sp-list" class="bond-list"></div>
   <p id="sp-empty" class="empty" hidden></p>
@@ -151,6 +157,7 @@
   <header class="inn-head">
     <p class="eyebrow"><span class="eyebrow-gem" aria-hidden="true"></span>The inn at Dagsion</p>
     <h1 id="meals-heading" tabindex="-1">Share a meal</h1>
+    <span class="weave-slot center" data-weave aria-hidden="true"></span>
     <p class="subtitle">Seat three. Bonds grow between every pair at the table.</p>
   </header>
   <div class="table-stage" id="table-stage">
@@ -195,6 +202,7 @@
         <button type="button" data-filter="unviewed" aria-pressed="false">Unviewed</button>
       </div>
     </div>
+    <span class="weave-slot small" data-weave aria-hidden="true"></span>
     <div class="progress-row">
       <div class="weave-bar" aria-hidden="true"><i id="missables-bar-fill"></i></div>
       <p id="missables-progress" role="status" aria-live="polite"></p>
@@ -215,7 +223,7 @@
     <span class="crest" aria-hidden="true"><img src="icon.svg" alt="" width="64" height="64"></span>
     <p class="eyebrow">Save files &amp; the small print</p>
     <h1 id="about-title" tabindex="-1">A guide, not a spoiler.</h1>
-    <svg class="weave" viewBox="0 0 400 24" preserveAspectRatio="none" aria-hidden="true"><path d="M0 12C50 1 50 23 100 12S150 1 200 12s50 11 100 0 50-11 100 0"/><path d="M0 12C50 23 50 1 100 12s50 11 100 0 50-11 100 0 50 11 100 0"/><circle cx="200" cy="12" r="2.6"/></svg>
+    <span class="weave-slot center" data-weave aria-hidden="true"></span>
   </header>
   <div class="codex">
     <div class="backup-card" id="files-card">
@@ -307,14 +315,16 @@
   <p class="note files-lead">Saved automatically — nothing to press. Tap a file to continue it.</p>
   <div id="files-list" class="files-list"></div>
   <div class="new-file">
+    <span class="weave-slot small center" data-weave="plain" aria-hidden="true"></span>
     <h3>Start a new playthrough</h3>
     <div class="lord-pick" id="new-file-lords"></div>
   </div>
 </dialog>
-<script src="store.js?v=21"></script>
-<script src="app.js?v=22" defer></script>
-<script src="supports.js?v=22" defer></script>
-<script src="meals.js?v=21" defer></script>
-<script src="missables.js?v=22" defer></script>
+<script src="store.js?v=30"></script>
+<script src="fx.js?v=30" defer></script>
+<script src="app.js?v=31" defer></script>
+<script src="supports.js?v=31" defer></script>
+<script src="meals.js?v=30" defer></script>
+<script src="missables.js?v=30" defer></script>
 </body>
 </html>

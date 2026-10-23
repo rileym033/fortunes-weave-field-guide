@@ -1,0 +1,118 @@
+/* ==========================================================================
+   v2 motion layer — woven threads, bursts, flights, washes.
+   Global prefers-reduced-motion rule in style.css settles all of these instantly.
+   ========================================================================== */
+
+/* ---------- Woven threads ---------- */
+.weave-slot{display:block;width:min(260px,72%);height:22px;margin:6px 0 10px;pointer-events:none}
+.weave-slot.center{margin-left:auto;margin-right:auto}
+.weave-slot.small{width:min(180px,56%);height:18px}
+.weave2{display:block;width:100%;height:100%;overflow:visible}
+.weave2 path{fill:none;vector-effect:non-scaling-stroke;stroke-linecap:round}
+.weave2 .s1{stroke:var(--gold);stroke-width:1.3;filter:drop-shadow(0 0 3px rgba(226,194,122,.55))}
+.weave2 .s2{stroke:color-mix(in oklab,var(--glow) 55%,var(--gold-2));stroke-width:1.1;opacity:.85}
+.weave2 .wflow.a{animation:weave-flow-a 7s linear infinite}
+.weave2 .wflow.b{animation:weave-flow-b 9s linear infinite}
+.weave2 .wclip{transform-box:fill-box;transform-origin:50% 50%;transform:scaleX(0);animation:weave-open 1.5s cubic-bezier(.16,1,.3,1) .15s forwards}
+.weave2 .bead{fill:var(--gold-hi);filter:drop-shadow(0 0 4px var(--gold)) drop-shadow(0 0 8px rgba(255,241,196,.7))}
+.weave2 .bead.dim{fill:color-mix(in oklab,var(--glow) 40%,#fff6dc)}
+.weave2 .knot{fill:var(--gold-hi);transform-box:fill-box;transform-origin:center;animation:knot-glint 3.2s ease-in-out infinite;filter:drop-shadow(0 0 5px var(--gold))}
+@keyframes weave-flow-a{to{transform:translateX(200px)}}
+@keyframes weave-flow-b{to{transform:translateX(-200px)}}
+@keyframes weave-open{to{transform:scaleX(1)}}
+@keyframes knot-glint{0%,100%{transform:scale(1) rotate(0)}50%{transform:scale(1.35) rotate(45deg)}}
+.about-head .weave-slot{margin:0 auto}
+.hero-copy .weave-slot{width:min(210px,60%);margin:2px 0 8px}
+.ph-copy .weave-slot{margin:-4px 0 10px}
+
+/* Pair sheet: the thread between two portraits */
+.pair-hero .bond-weave{position:relative;width:86px;height:26px;flex:none}
+.pair-hero .bond-weave .weave2 .s1{stroke-width:1.8}
+.pair-hero .bond-weave .weave2 .s2{stroke-width:1.5}
+.pair-hero .bond-weave .knot-ico{position:absolute;left:50%;top:50%;width:30px;height:30px;margin:-15px;display:grid;place-items:center;border-radius:50%;
+  background:radial-gradient(circle,rgba(4,12,13,.9) 45%,transparent 72%);color:var(--gold-hi);animation:breathe 3.6s ease-in-out infinite}
+.pair-hero .bond-weave .knot-ico .ico{width:22px;height:22px}
+.pair-hero .pf{animation:pair-in .6s var(--spring) both}
+.pair-hero .pf:last-child{animation-delay:.08s}
+@keyframes pair-in{from{transform:translateY(10px) scale(.9);opacity:0}}
+
+/* ---------- Sparkle bursts ---------- */
+.burst{position:relative}
+.burst::after{content:"";position:absolute;z-index:3;left:50%;top:50%;width:5px;height:5px;margin:-2.5px;border-radius:50%;pointer-events:none;
+  animation:burst .75s cubic-bezier(.16,1,.3,1) var(--burst-delay,0ms) both;color:var(--gold-hi)}
+@keyframes burst{
+  from{opacity:1;box-shadow:0 0 0 0 currentColor,0 0 0 0 currentColor,0 0 0 0 currentColor,0 0 0 0 currentColor,0 0 0 0 currentColor,0 0 0 0 currentColor,0 0 0 0 currentColor,0 0 0 0 currentColor}
+  to{opacity:0;box-shadow:0 -24px 0 -1px currentColor,17px -17px 0 -1.5px currentColor,24px 0 0 -1px currentColor,17px 17px 0 -1.5px currentColor,0 24px 0 -1px currentColor,-17px 17px 0 -1.5px currentColor,-24px 0 0 -1px currentColor,-17px -17px 0 -1.5px currentColor}}
+.pip.burst span{animation:seal-pop .55s var(--spring) var(--burst-delay,0ms)}
+.seat.burst::after{color:#fff1c4;top:38%}
+
+/* ---------- Meal table ---------- */
+.thread.fresh{stroke-dasharray:var(--len) var(--len);stroke-dashoffset:var(--len);animation:draw .9s cubic-bezier(.16,1,.3,1) .05s forwards}
+.thread.fade{animation:fade-in .6s ease-out both}
+.thread-gem .gem-in{transform-box:fill-box;transform-origin:center}
+.thread-gem.fresh .gem-in{animation:gem-pop .55s var(--spring) .55s both}
+.spark{fill:#fff1c4;filter:drop-shadow(0 0 4px var(--gold)) drop-shadow(0 0 9px rgba(226,194,122,.8))}
+.spark.ready{fill:#c9fff5;filter:drop-shadow(0 0 4px var(--ok)) drop-shadow(0 0 9px rgba(120,213,198,.8))}
+@keyframes gem-pop{from{transform:scale(0) rotate(-90deg);opacity:0}}
+@keyframes fade-in{from{opacity:0}}
+.seat.filled .seat-btn .pf{animation:none}
+.seat.filled.fresh .seat-btn .pf{animation:seat-in .55s var(--spring)}
+.hearth.flare{animation:flare 1.2s ease-out,flicker 2.6s ease-in-out 1.2s infinite}
+@keyframes flare{0%{transform:scale(1);filter:brightness(1)}30%{transform:scale(1.7);filter:brightness(1.8) drop-shadow(0 0 18px #ffb347)}100%{transform:scale(1);filter:brightness(1)}}
+.table-top{transition:box-shadow .8s ease}
+.table-stage.full .table-top{box-shadow:inset 0 0 0 3px rgba(226,194,122,.55),inset 0 0 0 9px rgba(0,0,0,.25),inset 0 -12px 30px rgba(0,0,0,.55),0 22px 40px -16px #000,0 0 60px -18px rgba(255,170,70,.75)}
+.fly-ghost{position:fixed;z-index:80;object-fit:cover;object-position:top;pointer-events:none;border:2px solid #f6e2a8;box-shadow:0 14px 30px -8px #000,0 0 22px rgba(226,194,122,.7);will-change:transform}
+
+/* ---------- Lord colour wash ---------- */
+.lord-wash{position:fixed;inset:0;z-index:75;pointer-events:none;mix-blend-mode:screen}
+.hero-art-wrap.swap .hero-art{animation:art-swap 1s cubic-bezier(.16,1,.3,1)}
+@keyframes art-swap{from{opacity:0;transform:scale(1.12)}}
+.page-hero.swap .ph-art img{animation:art-swap .9s cubic-bezier(.16,1,.3,1)}
+
+/* ---------- Filters ---------- */
+.tri.bump{animation:tri-bump .45s var(--spring)}
+.tri.bump .tri-mark .ico{animation:mark-spin .45s var(--spring)}
+@keyframes tri-bump{40%{transform:scale(1.08)}}
+@keyframes mark-spin{from{transform:rotate(-120deg) scale(.3)}}
+.tri[data-state="exc"] .tri-text{text-decoration:none;background:linear-gradient(rgba(255,122,107,.95),rgba(255,122,107,.95)) 0 58%/100% 1.5px no-repeat}
+.tri.bump[data-state="exc"] .tri-text{animation:strike .4s ease-out}
+@keyframes strike{from{background-size:0 1.5px}}
+.af{animation:chip-in .35s var(--spring) both}
+@keyframes chip-in{from{transform:scale(.7);opacity:0}}
+
+/* ---------- Dock ---------- */
+.bottomnav button.hop .ico{animation:nav-hop .6s var(--spring)}
+@keyframes nav-hop{0%{transform:translateY(0) scale(1)}35%{transform:translateY(-7px) scale(1.18) rotate(-6deg)}70%{transform:translateY(1px) scale(.98)}100%{transform:translateY(-1px) scale(1.06)}}
+
+/* ---------- Supports: cast strip ---------- */
+.cast-wrap{margin:14px calc(-1*var(--gutter)) 0}
+.cast-head{display:flex;justify-content:space-between;align-items:baseline;padding:0 var(--gutter);margin-bottom:6px}
+.cast-head b{font:600 11px/1 var(--caps);letter-spacing:.16em;text-transform:uppercase;color:var(--gold)}
+.cast-head small{font:600 12px/1 var(--ui);color:var(--muted)}
+.cast-strip{display:flex;gap:4px;overflow-x:auto;padding:6px var(--gutter) 10px;scroll-snap-type:x proximity;scrollbar-width:none;overscroll-behavior-x:contain;
+  -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 14px,#000 calc(100% - 14px),transparent);mask-image:linear-gradient(90deg,transparent 0,#000 14px,#000 calc(100% - 14px),transparent)}
+.cast-strip::-webkit-scrollbar{display:none}
+.cast{position:relative;flex:none;display:grid;justify-items:center;gap:5px;width:64px;min-height:84px;padding:4px 0;border:0;background:none;color:var(--muted);font:600 11.5px/1.1 var(--ui);scroll-snap-align:center;transition:color .3s}
+.cast img{width:48px;height:48px;border-radius:50%;object-fit:cover;object-position:50% 12%;border:1.5px solid rgba(226,194,122,.35);background:#0b1d20;transition:transform .35s var(--spring),border-color .3s,box-shadow .3s}
+.cast span{max-width:62px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cast[aria-pressed="true"]{color:var(--gold-hi)}
+.cast[aria-pressed="true"] img{border-color:var(--gold-hi);transform:scale(1.1);box-shadow:0 0 0 2px color-mix(in oklab,var(--glow) 60%,transparent),0 0 16px var(--glow)}
+.cast .dot{position:absolute;top:4px;right:9px;width:10px;height:10px;transform:rotate(45deg);border-radius:2px;background:var(--ok);box-shadow:0 0 8px var(--ok);border:1.5px solid var(--bg-0)}
+.cast-sep{flex:none;width:1px;margin:10px 6px 30px;background:linear-gradient(transparent,var(--line-2),transparent)}
+
+/* ---------- Supports: per-rank requirements ---------- */
+.rank-steps li.unconfirmed .pip span{border-style:dashed}
+.rank-steps .req{display:block;margin-top:3px;font:italic 600 15px/1.3 var(--display);color:#e3d6b6}
+.rank-steps .req .ico{width:13px;height:13px;margin-right:4px;vertical-align:-1px;color:var(--gold)}
+.rank-steps .conf{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;border:1px dashed var(--line-2);font:600 11px/1.4 var(--ui);color:var(--muted);font-style:normal}
+.pip.unconfirmed span{border-style:dashed;opacity:.8}
+
+@media (prefers-reduced-motion:reduce){
+  .weave2 .bead,.spark{display:none}
+  .weave2 .wclip{transform:none}
+  .thread.fresh{stroke-dashoffset:0}
+}
+@supports not (color:color-mix(in srgb,red,blue)){
+  .weave2 .s2{stroke:var(--gold-2)}
+  .weave2 .bead.dim{fill:#fff6dc}
+}

@@ -114,7 +114,7 @@ const STATUS_CLASS={optional:'s-optional',auto:'s-auto',tutorial:'s-tutorial',no
 FG.statusKey=statusKey;FG.STATUS_LABEL=STATUS_LABEL;FG.STATUS_CLASS=STATUS_CLASS;
 const hasItems=rt=>!!rt&&!!rt.materials&&!/^(none listed|—|-)$/i.test(rt.materials.trim());
 const hasGold=rt=>!!rt&&/\d/.test(rt.gold||'');
-const hasExtra=rt=>!!rt&&!!rt.notes&&!/^(—|-|availability\/progression gates may apply\.?)$/i.test(rt.notes.trim());
+const hasExtra=rt=>!!rt&&Array.isArray(rt.steps)&&rt.steps.length>0;
 function filterGroups(){
   const lord=FG.lord(),teamAll=[lord,...FG.team(lord)];
   return[
@@ -149,7 +149,8 @@ $('filter-groups').addEventListener('click',e=>{
   const k=b.dataset.f,s=filterState.get(k)||'off',next={off:'inc',inc:'exc',exc:'off'}[s];
   if(next==='off')filterState.delete(k);else filterState.set(k,next);
   renderFilterGroups();render({animate:false});
-  $('filter-groups').querySelector(`[data-f="${CSS.escape(k)}"]`)?.focus();
+  const nb=$('filter-groups').querySelector(`[data-f="${CSS.escape(k)}"]`);
+  if(nb){nb.focus();if(!reduceMotion())nb.classList.add('bump');}
 });
 $('active-filters').addEventListener('click',e=>{
   const b=e.target.closest('[data-clear]');if(!b)return;
@@ -218,21 +219,26 @@ function render({animate=true}={}){
   $('direction').textContent=ascending?'↑ Ascending':'↓ Descending';
   renderActiveFilters();
 }
+let heroPainted=false;
 function updateHero(){
   const p=store.profile(),lord=p.lord;
   document.documentElement.dataset.lord=lord;
   $('hero-lord').textContent=`${lord}’s`;
   const art=$('hero-art'),cfg=HERO_ART[lord],src=`art/${lord.toLowerCase()}.webp`;
-  if(art.getAttribute('src')!==src)art.setAttribute('src',src);
+  if(art.getAttribute('src')!==src){
+    art.setAttribute('src',src);
+    if(heroPainted&&!reduceMotion()){const w=art.parentElement;w.classList.remove('swap');void w.offsetWidth;w.classList.add('swap');}
+  }
+  heroPainted=true;
   art.style.objectPosition=cfg.pos;art.style.translate=`0 ${cfg.lift}`;
   $('save-chip-name').textContent=p.name;
   $('save-chip-face').src=FG.portrait(lord);
   $('legend-lord').textContent=`Support lv. = with ${lord}`;
   if(!D.roster)return;
   const joinable=D.roster.characters.filter(c=>{const rt=FG.routeOf(c.name);return rt&&rt.status!=='No';});
-  $('stat-recruitable').textContent=joinable.length;
-  $('stat-wishlist').textContent=p.wishlist.length;
-  $('stat-recruited').textContent=p.recruited.length;
+  FG.countTo($('stat-recruitable'),joinable.length);
+  FG.countTo($('stat-wishlist'),p.wishlist.length);
+  FG.countTo($('stat-recruited'),p.recruited.length);
   const done=joinable.filter(c=>p.recruited.includes(c.name)).length;
   $('hero-bar-fill').style.setProperty('--p',(joinable.length?done/joinable.length*100:0)+'%');
 }
@@ -259,12 +265,14 @@ function setTab(next,moveFocus=false){
   tab=next;
   document.querySelectorAll('.bottomnav [data-tab]').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
   Object.entries(VIEWS).forEach(([k,id])=>{$(id).hidden=k!==tab;});
-  if(tab==='missables')FG.onMissablesShown?.();else FG.setTheme('');
+  if(tab==='missables')FG.onMissablesShown?.();else FG.setTheme(FG.lord());
   if(tab==='supports')FG.onSupportsShown?.();
   if(tab==='meals')FG.onMealsShown?.();
   if(tab==='about')renderFiles();
   if(tab==='all')render();
   moveInk();window.scrollTo(0,0);
+  const cur=document.querySelector('.bottomnav [aria-current]');if(cur&&!reduceMotion()){cur.classList.remove('hop');void cur.offsetWidth;cur.classList.add('hop');}
+  FG.replayWeaves?.($(VIEWS[tab]));
   if(moveFocus){const h=$(VIEW_HEADINGS[tab]);h.tabIndex=-1;h.focus({preventScroll:true});}
 }
 FG.setTab=setTab;
@@ -325,6 +333,13 @@ function foodSection(name){
   const body=line('love','Loves')+line('like','Likes')+line('dislike','Dislikes');
   return body?`<dt><svg class="ico" aria-hidden="true"><use href="#i-meal"/></svg>At the table</dt><dd>${body}</dd>`:'';
 }
+function recruitSteps(rt,sk){
+  if(!rt||sk==='no')return '<span class="unknown">Not recruitable on this route.</span>';
+  if(sk==='auto')return 'Joins automatically.';
+  const steps=rt.steps||[];
+  const base=`<li class="step-base">Reach support level <b>${rt.support??'—'}</b> with ${esc(FG.lord())} and renown <b>${rt.renown??'—'}</b></li>`;
+  return `<ol class="steps">${base}${steps.map(t=>`<li>${esc(t)}</li>`).join('')}</ol>`+(steps.length?'':'<p class="note">No extra steps listed — the levels above are enough.</p>');
+}
 function showDetail(name,open=true){
   const c=D.byName.get(name);if(!c)return;
   activeName=name;const focused=document.activeElement?.id;
@@ -333,10 +348,11 @@ function showDetail(name,open=true){
     `<div class="detailhero"><span class="pf"><img src="${esc(c.portrait)}" alt="${esc(name)} portrait">${recruited?sealBadge:''}</span><div><h2 id="detail-name">${esc(name)}</h2><span class="status ${STATUS_CLASS[sk]}">${STATUS_LABEL[sk]}</span><p class="route-note">On ${esc(p.lord)}’s route</p></div></div>`+
     `<div class="medallions"><div class="medal"><b>${rt?.support??'—'}</b><span>Support lv. with ${esc(p.lord)}</span></div><div class="medal"><b>${rt?.renown??'—'}</b><span>Required renown</span></div></div>`+
     (rt?.certainty==='conflict'?'<p class="warning">Guides disagree on part of this requirement — double-check in game.</p>':'')+
-    `<dl class="facts">`+(rt?.chapter?`<dt><svg class="ico" aria-hidden="true"><use href="#i-clock"/></svg>From</dt><dd>Chapter ${esc(rt.chapter)}</dd>`:'')+
+    `<dl class="facts">`+(rt?.window||rt?.chapter?`<dt><svg class="ico" aria-hidden="true"><use href="#i-clock"/></svg>When</dt><dd>${esc(rt.window||`From Chapter ${rt.chapter}`)}</dd>`:'')+
+    (rt?.find?`<dt><svg class="ico" aria-hidden="true"><use href="#i-pin"/></svg>Where</dt><dd>${esc(rt.find)}</dd>`:'')+
     `<dt><svg class="ico" aria-hidden="true"><use href="#i-scroll"/></svg>Materials</dt><dd>${esc(rt?.materials??'—')}</dd>`+
     `<dt><svg class="ico" aria-hidden="true"><use href="#i-coin"/></svg>Gold</dt><dd>${esc(rt?.gold??'—')}</dd>`+
-    `<dt><svg class="ico" aria-hidden="true"><use href="#i-spark"/></svg>Other conditions</dt><dd>${esc(rt?.notes??'—')}</dd>`+
+    `<dt><svg class="ico" aria-hidden="true"><use href="#i-spark"/></svg>How to recruit</dt><dd>${recruitSteps(rt,sk)}</dd>`+
     `<dt><svg class="ico" aria-hidden="true"><use href="#i-company"/></svg>Every lord</dt><dd>${lordTable(c)}</dd>`+
     `<dt><svg class="ico" aria-hidden="true"><use href="#i-bond"/></svg>Support conversations</dt><dd>${bondsSection(name)}</dd>`+
     foodSection(name)+`</dl>`+
@@ -437,17 +453,15 @@ FG.wireSheet($('files'),$('close-files'),()=>$('save-chip').focus({preventScroll
 
 /* Auto-save indicator */
 /* Visual only: routine saves are not announced; failures surface in #storage-warning. */
-let savedTimer=0;
-function paintSaveState(h,pulse){
-  const s=$('save-state'),label=h.durable?'Saved':h.pending?'Saving…':'Not saved';
-  if(s.querySelector('span').textContent!==label)s.querySelector('span').textContent=label;
-  s.classList.toggle('bad',!h.durable&&!h.pending);
-  $('save-chip').setAttribute('aria-label',`Save file: ${store.profile().name}. ${label}. Open save files`);
-  $('storage-warning').hidden=h.durable||h.pending;
-  if(pulse&&!reduceMotion()){s.classList.remove('pulse');void s.offsetWidth;s.classList.add('pulse');clearTimeout(savedTimer);savedTimer=setTimeout(()=>s.classList.remove('pulse'),1400);}
+function paintSaveState(h){
+  /* Saving is automatic, so the chip stays quiet unless saving actually fails. */
+  const failing=!h.durable&&!h.pending,s=$('save-state');
+  s.hidden=!failing;
+  $('save-chip').setAttribute('aria-label',`Save file: ${store.profile().name}.${failing?' Not saved.':''} Open save files`);
+  $('storage-warning').hidden=!failing;
 }
-store.on('saved',h=>paintSaveState(h,true));
-store.on('health',h=>{paintSaveState(h,false);if(tab==='about')renderFiles();});
+store.on('saved',h=>paintSaveState(h));
+store.on('health',h=>{paintSaveState(h);if(tab==='about')renderFiles();});
 
 /* ---------- Transfer code ---------- */
 const backupStatus=msg=>{$('backup-status').textContent=msg;};
@@ -471,12 +485,16 @@ function refreshAll(){
     lastLord=lord;renderFilterGroups();
   }
   updateHero();
+  if(tab!=='missables')FG.setTheme(lord);
   if(tab==='all')render({animate:false});
   if(tab==='about'||$('files').open)renderFiles();
   if($('detail').open&&activeName)showDetail(activeName,false);
   FG.onProfileChange.forEach(fn=>fn());
 }
 store.on('change',refreshAll);
+store.on('change',e=>{if(e?.source==='switch')FG.wash(FG.lord(),$('files').open?$('files').querySelector('.file.active')||$('save-chip'):$('save-chip'));});
+FG.setTheme(FG.lord());
+FG.mountWeaves(document);FG.observeWeaves(document);
 updateHero();
 FG.ready.then(()=>{lastLord=FG.lord();renderFilterGroups();updateHero();render();FG.onDataReady.forEach(fn=>fn());})
   .catch(()=>{$('load-error').hidden=false;$('count').textContent='Roster unavailable';});

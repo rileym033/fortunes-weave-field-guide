@@ -5,7 +5,7 @@ const store=FG.store,D=FG.data;
 const SEAT_POS=[{x:150,y:44},{x:52,y:196},{x:248,y:196}];
 const PREF_SCORE={love:2,like:1,neutral:0,dislike:-2};
 const PREF_ICON={love:'♥',like:'✓',neutral:'–',dislike:'✕'};
-let prefsWishlist=false,hideNo=false;
+let prefsWishlist=false,hideNo=false,prevSeats=null,prevPairs=new Set(),wasFull=false;
 
 const seats=()=>store.profile().meal.seats.slice();
 function setSeats(next){store.update(p=>{p.meal.seats=next.slice(0,3);});}
@@ -65,26 +65,36 @@ function recommend(){
 }
 
 function renderTable(){
-  const s=seats(),filled=s.filter(Boolean);
+  const s=seats(),filled=s.filter(Boolean),first=prevSeats===null;
   $('seats').innerHTML=s.map((n,i)=>{
-    const pos=SEAT_POS[i];
-    return `<div class="seat${n?' filled':''}" style="--x:${pos.x/3}%;--y:${pos.y/2.5}%">`+
+    const pos=SEAT_POS[i],fresh=n&&!first&&prevSeats[i]!==n;
+    return `<div class="seat${n?' filled':''}${fresh?' fresh':''}" style="--x:${pos.x/3}%;--y:${pos.y/2.5}%">`+
       (n?`<button type="button" class="seat-btn" data-seat="${i}" aria-label="Seat ${i+1}: ${esc(n)}. Change"><span class="pf"><img src="${esc(FG.portrait(n))}" alt=""></span><span class="seat-name">${esc(n)}</span></button>`+
          `<button type="button" class="seat-x" data-clear-seat="${i}" aria-label="Remove ${esc(n)} from the table"><svg class="ico" aria-hidden="true"><use href="#i-close"/></svg></button>`
         :`<button type="button" class="seat-btn empty" data-seat="${i}" aria-label="Seat ${i+1}: empty. Choose a guest"><span class="pf"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg></span><span class="seat-name">Empty seat</span></button>`)+
     `</div>`;
   }).join('');
   // Threads between seated guests: gold when a conversation is waiting.
-  let svg='';
+  let svg='';const nowPairs=new Set();
   for(let i=0;i<3;i++)for(let j=i+1;j<3;j++){
     if(!s[i]||!s[j])continue;
-    const info=pairInfo(s[i],s[j]),a=SEAT_POS[i],b=SEAT_POS[j];
-    const cls=!info.has?'none':info.done?'done':info.ready?'ready':'open';
+    const info=pairInfo(s[i],s[j]),a=SEAT_POS[i],b=SEAT_POS[j],key=FG.pairKey(s[i],s[j]);
+    nowPairs.add(key);
+    const cls=!info.has?'none':info.done?'done':info.ready?'ready':'open',isNew=!first&&!prevPairs.has(key);
     const mx=(a.x+b.x)/2,my=(a.y+b.y)/2+(i===0?-6:10);
-    svg+=`<path class="thread ${cls}" d="M${a.x} ${a.y} Q${(mx+150)/2} ${(my+125)/2} ${b.x} ${b.y}"/>`;
-    if(info.has&&!info.done)svg+=`<g class="thread-gem ${cls}" transform="translate(${mx} ${my})"><rect x="-11" y="-11" width="22" height="22" rx="4" transform="rotate(45)"/><text y="4.5" text-anchor="middle">${info.next}</text></g>`;
+    const d=`M${a.x} ${a.y} Q${(mx+150)/2} ${(my+125)/2} ${b.x} ${b.y}`;
+    const solid=cls==='open'||cls==='ready';
+    svg+=`<path class="thread ${cls}${isNew?(solid?' fresh':' fade'):''}" d="${d}"/>`;
+    if(solid)svg+=`<circle class="spark ${cls}" r="2.6"><animateMotion dur="2.8s" ${isNew?'begin="0.9s"':''} repeatCount="indefinite" path="${d}"/></circle>`+
+                  `<circle class="spark ${cls}" r="1.8" opacity=".75"><animateMotion dur="2.8s" begin="${isNew?2.3:-1.4}s" repeatCount="indefinite" keyPoints="1;0" keyTimes="0;1" calcMode="linear" path="${d}"/></circle>`;
+    if(info.has&&!info.done)svg+=`<g class="thread-gem ${cls}${isNew?' fresh':''}" transform="translate(${mx} ${my})"><g class="gem-in"><rect x="-11" y="-11" width="22" height="22" rx="4" transform="rotate(45)"/><text y="4.5" text-anchor="middle">${info.next}</text></g></g>`;
   }
   $('table-links').innerHTML=svg;
+  $('table-links').querySelectorAll('.thread.fresh').forEach(t=>{try{t.style.setProperty('--len',Math.ceil(t.getTotalLength())+'');}catch{}});
+  const full=s.every(Boolean);
+  $('table-stage').classList.toggle('full',full);
+  if(full&&!wasFull&&!first){const h=document.querySelector('.hearth');h.classList.remove('flare');void h.offsetWidth;h.classList.add('flare');}
+  wasFull=full;prevSeats=s.slice();prevPairs=nowPairs;
   const pairs=[];
   for(let i=0;i<3;i++)for(let j=i+1;j<3;j++)if(s[i]&&s[j])pairs.push([s[i],s[j]]);
   $('meal-pairs').innerHTML=pairs.length?pairs.map(([a,b])=>{const info=pairInfo(a,b);
@@ -132,7 +142,14 @@ $('seats').addEventListener('click',e=>{
 });
 $('rec-list').addEventListener('click',e=>{
   const add=e.target.closest('[data-add]'),info=e.target.closest('[data-info]');
-  if(add){const s=seats(),i=s.indexOf(null);if(i<0)return;s[i]=add.dataset.add;setSeats(s);FG.toast(`${add.dataset.add} takes a seat`);$('seats').querySelector(`[data-seat="${i}"]`)?.focus({preventScroll:true});}
+  if(add){
+    const s=seats(),i=s.indexOf(null);if(i<0)return;
+    const from=add.closest('.rec')?.querySelector('.rec-open img');
+    s[i]=add.dataset.add;setSeats(s);FG.toast(`${add.dataset.add} takes a seat`);
+    const seatBtn=$('seats').querySelector(`[data-seat="${i}"]`);
+    FG.fly(from,seatBtn?.querySelector('img'));
+    seatBtn?.focus({preventScroll:true});
+  }
   else if(info&&FG.data.byName.has(info.dataset.info))FG.showDetail(info.dataset.info);
 });
 $('meal-pairs').addEventListener('click',e=>{const b=e.target.closest('[data-pa]');if(!b||!FG.pair(b.dataset.pa,b.dataset.pb))return;const pa=b.dataset.pa,pb=b.dataset.pb;
