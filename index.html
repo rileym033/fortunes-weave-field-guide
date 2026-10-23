@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en" data-theme="">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b272b">
+<meta name="color-scheme" content="dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Field Guide">
+<meta name="format-detection" content="telephone=no">
+<title>Theodora’s Field Guide</title>
+<link rel="preload" href="fonts/cinzel-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/cormorant-garamond-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="missables.css?v=6">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-company" viewBox="0 0 24 24"><path d="M12 2.8 19 5.6v5.6c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V5.6z"/><path d="m12 7.4 1.3 2.7 3 .4-2.2 2.1.5 3L12 14.2l-2.6 1.4.5-3-2.2-2.1 3-.4z"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3.2 2.7 5.5 6 .9-4.35 4.2 1 6-5.35-2.85-5.35 2.85 1-6L3.3 9.6l6-.9z"/></symbol>
+  <symbol id="i-seal" viewBox="0 0 24 24"><path d="M12 2.6l2.1 1.6 2.6-.2.9 2.5 2.3 1.2-.4 2.6 1.4 2.2-1.4 2.2.4 2.6-2.3 1.2-.9 2.5-2.6-.2L12 21.4l-2.1-1.6-2.6.2-.9-2.5-2.3-1.2.4-2.6L3.1 12l1.4-2.2-.4-2.6 2.3-1.2.9-2.5 2.6.2z"/><path d="m8.4 12.2 2.4 2.4 4.8-5"/></symbol>
+  <symbol id="i-hourglass" viewBox="0 0 24 24"><path d="M6.5 3h11M6.5 21h11"/><path d="M8 3c0 4.6 8 5 8 9s-8 4.4-8 9M16 3c0 4.6-8 5-8 9s8 4.4 8 9"/><path d="M10 18.6c.8-.7 3.2-.7 4 0"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M3 5.4c2.6-1.5 5.6-1.5 9 .6 3.4-2.1 6.4-2.1 9-.6v13.4c-2.6-1.4-5.6-1.4-9 .6-3.4-2-6.4-2-9-.6z"/><path d="M12 6v13.4"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.2"/><path d="m15.2 15.2 5 5"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2.2"/><circle cx="9" cy="17" r="2.2"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+  <symbol id="i-chev-l" viewBox="0 0 24 24"><path d="m14.5 5-7 7 7 7"/></symbol>
+  <symbol id="i-chev-r" viewBox="0 0 24 24"><path d="m9.5 5 7 7-7 7"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></symbol>
+  <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M4.8 20.2c1-3.8 3.8-5.7 7.2-5.7s6.2 1.9 7.2 5.7"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3c.6 4.5 2.5 6.4 7 7-4.5.6-6.4 2.5-7 7-.6-4.5-2.5-6.4-7-7 4.5-.6 6.4-2.5 7-7z"/><path d="M18.5 16.5c.2 1.5.8 2.1 2.3 2.3-1.5.2-2.1.8-2.3 2.3-.2-1.5-.8-2.1-2.3-2.3 1.5-.2 2.1-.8 2.3-2.3z"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="12" r="3.8"/><path d="M11.8 12H21M17.5 12v3.2M20.5 12v2.4"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.4"/><path d="M12 7.2V12l3.2 2"/></symbol>
+  <symbol id="i-scroll" viewBox="0 0 24 24"><path d="M7 4h11a2 2 0 0 1 2 2v1h-4"/><path d="M16 7v11a2.5 2.5 0 0 1-5 0v-1H4v1a2.5 2.5 0 0 0 2.5 2.5H13.5"/><path d="M7 4a2 2 0 0 0-2 2v11"/><path d="M8.5 9h4.5M8.5 12.5h4.5"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6.5a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"/></symbol>
+  <symbol id="i-restore" viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4.5 4.5v4h4"/></symbol>
+  <symbol id="i-coin" viewBox="0 0 24 24"><ellipse cx="12" cy="6.8" rx="7" ry="2.8"/><path d="M5 6.8v5c0 1.6 3.1 2.8 7 2.8s7-1.2 7-2.8v-5M5 11.8v5c0 1.6 3.1 2.8 7 2.8s7-1.2 7-2.8v-5"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.4 4.4L19 7.4"/></symbol>
+</svg>
+
+<div class="backdrop" aria-hidden="true"><div class="backdrop-glow"></div><div class="backdrop-ornament"></div></div>
+
+<main id="app">
+<p id="storage-warning" class="warning" role="status" hidden>Browser storage is unavailable. Your marks work for this visit but may not be saved.</p>
+
+<!-- ============ COMPANY / ROSTER ============ -->
+<section id="roster-view" class="view" aria-labelledby="hero-title">
+  <header class="hero" id="hero">
+    <div class="hero-art-wrap" aria-hidden="true"><img class="hero-art" src="art/theodora.webp" alt="" width="860" height="512" decoding="async" fetchpriority="high"></div>
+    <div class="motes" aria-hidden="true"></div>
+    <div class="hero-copy">
+      <p class="eyebrow"><span class="eyebrow-gem" aria-hidden="true"></span>Fire Emblem · Fortune’s Weave</p>
+      <h1 id="hero-title" tabindex="-1"><span class="h1-small">Theodora’s</span><span class="h1-big">Field Guide</span></h1>
+      <p class="subtitle">A little preparation. A stronger company.</p>
+      <div class="hero-stats" id="hero-stats">
+        <button class="stat" type="button" data-jump="all" aria-label="Show the whole company"><b id="stat-recruitable">—</b><span>Can join</span></button>
+        <button class="stat" type="button" data-jump="wishlist" aria-label="Show your wishlist"><b id="stat-wishlist">0</b><span>Wishlist</span></button>
+        <button class="stat" type="button" data-jump="recruited" aria-label="Show your recruits"><b id="stat-recruited">0</b><span>Recruited</span></button>
+      </div>
+      <div class="weave-bar hero-bar" aria-hidden="true"><i id="hero-bar-fill"></i></div>
+    </div>
+  </header>
+
+  <div class="toolbar" id="roster-toolbar">
+    <div class="searchrow">
+      <label class="searchbox"><svg class="ico" aria-hidden="true"><use href="#i-search"/></svg><input id="search" type="search" aria-label="Search characters or materials" placeholder="Name or item" autocomplete="off" enterkeyhint="search"></label>
+      <button id="filters-toggle" class="iconbtn" aria-expanded="false" aria-controls="filters"><svg class="ico" aria-hidden="true"><use href="#i-sliders"/></svg><span>Filters</span><i class="filter-dot" hidden></i></button>
+    </div>
+    <div id="filters" class="filters" hidden>
+      <div class="filtergrid">
+        <label>Recruitment<select id="status"><option value="all">All characters</option><option value="yes">Recruitable / automatic</option><option value="optional">Optional recruits</option><option value="auto">Automatic team</option><option value="no">Not recruitable</option></select></label>
+        <label>Support partner<select id="partner"><option value="all">All partners</option><option>Theodora</option><option>Lilian</option><option>Lysander</option><option>Tobias</option><option>Bonaventure</option><option value="none">No team supports listed</option></select></label>
+        <label>Sort by<select id="sort"><option value="name">Name</option><option value="support">Support level</option><option value="renown">Renown</option><option value="gold">Gold required</option><option value="status">Recruitment status</option><option value="supports">Support partner count</option></select></label>
+        <button id="direction" class="ghostbtn">↑ Ascending</button>
+      </div>
+      <button id="reset" class="textbutton">Reset search &amp; filters</button>
+    </div>
+  </div>
+
+  <div class="listmeta"><h2 id="view-title">The company</h2><span id="count" role="status" aria-live="polite">Opening field notes…</span></div>
+  <p class="legend"><span><b class="rank-gem r-A" aria-hidden="true">A</b> highest listed support scene</span><span>Support lv. = recruitment</span></p>
+  <div id="cards"></div>
+  <section id="empty" class="empty" hidden>
+    <span class="empty-crest" aria-hidden="true"><svg class="ico"><use href="#i-star"/></svg></span>
+    <h2>No field notes here</h2>
+    <p>Try another search or filter. Save characters with the star, or mark them recruited in their details.</p>
+    <button id="empty-reset" class="ghostbtn">Clear search &amp; filters</button>
+  </section>
+  <p id="load-error" class="warning" hidden>Could not open the roster. Check your connection and reload this page.</p>
+  <p class="endnote"><span class="end-orn" aria-hidden="true"></span>Spoiler-filtered · Community reference<br>Tap a portrait or name for requirements.</p>
+</section>
+
+<!-- ============ MISSABLES ============ -->
+<section id="missables-view" class="view" hidden aria-labelledby="missables-heading">
+  <div class="lord-stage" id="lord-stage">
+    <div class="lord-track" id="route-carousel" tabindex="0" role="region" aria-roledescription="carousel" aria-label="Lord routes. Swipe or use the arrow keys to change route."></div>
+    <button class="stage-arrow prev" id="route-prev" type="button" aria-label="Previous route"><svg class="ico" aria-hidden="true"><use href="#i-chev-l"/></svg></button>
+    <button class="stage-arrow next" id="route-next" type="button" aria-label="Next route"><svg class="ico" aria-hidden="true"><use href="#i-chev-r"/></svg></button>
+    <div class="lord-pager" id="route-pager" aria-hidden="true"></div>
+    <div class="motes" aria-hidden="true"></div>
+  </div>
+  <div class="route-tabs-wrap"><div class="route-tabs" id="route-tabs" role="tablist" aria-label="Choose a lord’s route"></div></div>
+  <p id="route-status" class="sr-only" aria-live="polite"></p>
+
+  <div class="missables-head">
+    <p class="eyebrow">Part I · Scenes &amp; Paralogues</p>
+    <div class="mh-row">
+      <h1 id="missables-heading" tabindex="-1">Missables</h1>
+      <div id="missables-filter" class="segmented" role="group" aria-label="Show">
+        <button type="button" data-filter="all" aria-pressed="true">All</button>
+        <button type="button" data-filter="unviewed" aria-pressed="false">Unviewed</button>
+      </div>
+    </div>
+    <div class="progress-row">
+      <div class="weave-bar" aria-hidden="true"><i id="missables-bar-fill"></i></div>
+      <p id="missables-progress" role="status" aria-live="polite"></p>
+    </div>
+  </div>
+  <p class="note hint"><svg class="ico" aria-hidden="true"><use href="#i-spark"/></svg>Tap a title for requirements, not story summaries.</p>
+  <p id="missables-storage-warning" class="warning" role="status" hidden>Checklist storage is unavailable or unreadable. Marks work for this visit but may not be saved.</p>
+  <p id="missables-load-error" class="warning" role="status" hidden>Missables notes are not available. Verified data may not be published yet, or the connection failed. No checklist has been inferred. Reload to try again.</p>
+  <div id="missables-list" role="tabpanel" aria-labelledby="missables-heading"></div>
+  <p id="missables-empty" class="empty" hidden></p>
+  <p class="note">Check off viewed notes · Saved in this browser only, separately for each route. No cloud sync.</p>
+  <div id="missables-coverage" class="note coverage"></div>
+</section>
+
+<!-- ============ ABOUT ============ -->
+<section id="about" class="view" hidden aria-labelledby="about-title">
+  <header class="about-head">
+    <span class="crest" aria-hidden="true"><img src="icon.svg" alt="" width="64" height="64"></span>
+    <p class="eyebrow">The small print</p>
+    <h1 id="about-title" tabindex="-1">A guide, not a spoiler.</h1>
+    <svg class="weave" viewBox="0 0 400 24" preserveAspectRatio="none" aria-hidden="true"><path d="M0 12C50 1 50 23 100 12S150 1 200 12s50 11 100 0 50-11 100 0"/><path d="M0 12C50 23 50 1 100 12s50 11 100 0 50-11 100 0 50 11 100 0"/><circle cx="200" cy="12" r="2.6"/></svg>
+  </header>
+  <div class="codex">
+    <p>Recruitment notes for Theodora’s initial route, with support partners limited to Theodora, Lilian, Lysander, Tobias &amp; Bonaventure. Major story recruits and story unlock details are excluded.</p>
+    <h3>Your pocket collection</h3>
+    <p>Star a character for your wishlist. Open their field note to mark them recruited. Both lists are independent and saved only in this browser on this device. <strong>No account. No cloud sync.</strong> Clearing website data clears your marks; private browsing may not keep them.</p>
+
+    <div class="backup-card" id="backup">
+      <h3><svg class="ico" aria-hidden="true"><use href="#i-scroll"/></svg>Keep your progress safe</h3>
+      <p>Safari can clear website data for sites you haven’t opened in a while. Copy a backup code now and then — paste it here later to restore your wishlist, recruits and checklist, in this or another browser.</p>
+      <div class="backup-actions">
+        <button id="backup-copy" class="goldbtn" type="button"><svg class="ico" aria-hidden="true"><use href="#i-copy"/></svg>Copy code</button>
+        <button id="backup-restore-toggle" class="ghostbtn" type="button" aria-expanded="false" aria-controls="backup-restore"><svg class="ico" aria-hidden="true"><use href="#i-restore"/></svg>Restore</button>
+      </div>
+      <div id="backup-restore" hidden>
+        <label for="backup-input" class="sr-only">Backup code</label>
+        <textarea id="backup-input" rows="3" placeholder="Paste a backup code…" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+        <button id="backup-apply" class="goldbtn" type="button">Restore progress</button>
+      </div>
+      <p id="backup-status" class="note" role="status" aria-live="polite"></p>
+    </div>
+
+    <h3>Add to your iPhone Home Screen</h3>
+    <p>Open this site in Safari, tap Share, then Add to Home Screen (you may need to scroll the menu). This is a hosted guide, not an offline app: a connection is required to load it. No service worker or offline guarantee is provided.</p>
+    <div id="source-notes">
+      <h3>Reading the field notes</h3>
+      <p><strong>Two different support measures:</strong> “Support lv.” is the numeric recruitment threshold. “Team supports” lists maximum conversation ranks (A/B/C), not recruitment levels and not a promise that every lower-rank scene exists. Scene availability can depend on progression or viewing order; those details are deliberately withheld.</p>
+      <p><strong>Coverage:</strong> the same 46 NPCs as the spreadsheet, including four automatic companions and NPCs unavailable on this initial lord route. The four selectable lords are not roster rows. “No” applies to recruitment on this initial route, not later-story availability. Supports listed for unavailable NPCs are reference data, not a claim they can join this team now.</p>
+      <p><strong>Uncertainty:</strong> “No team supports listed” means the community matrix records none with these five teammates—not independently proven absence. Rank entries were checked against the community matrix and support tracker; both share source material, so this is not independent in-game verification. Recruitment thresholds were compared between two guides. Sofia’s tutorial thresholds come from the more detailed guide. The conflicting Kiroc availability date is not asserted.</p>
+      <p><strong>Items:</strong> quantities are explicit when available; unspecified quest-item quantities are not guessed. Item types are plain-language labels. “None listed” does not rule out quest-related costs; “—” means not applicable. Gold sorting uses the minimum stated cost and places no-listed-cost entries at zero, with not-applicable entries last.</p>
+      <details class="spoiler-links">
+        <summary>Source links — <em>these pages contain spoilers</em></summary>
+        <ul class="link-list">
+          <li><a href="https://serenesforest.net/fortunes-weave/characters/recruitment/" target="_blank" rel="noopener noreferrer">Recruitment: Serenes Forest</a></li>
+          <li><a href="https://www.rpgsite.net/guide/21391-fire-emblem-fortunes-weave-recruitment-guide-all-characters-in-game-how-to-recruit-them" target="_blank" rel="noopener noreferrer">RPG Site</a></li>
+          <li><a href="https://docs.google.com/spreadsheets/d/18nxc2rXK4Im-9gPyUlLaDI3BkjNH8y77RNjhuRbgOBo/" target="_blank" rel="noopener noreferrer">Community support matrix</a></li>
+          <li><a href="https://fortunes-weave-supports.vercel.app/" target="_blank" rel="noopener noreferrer">Support tracker</a></li>
+          <li><a href="https://game8.co/games/Fire-Emblem-Fortunes-Weave/archives/619779" target="_blank" rel="noopener noreferrer">Portrait source: Game8</a></li>
+        </ul>
+        <p>Tracker lists its data check as 2026-10-15.</p>
+      </details>
+    </div>
+    <p class="endnote">Unofficial fan reference. Character artwork belongs to its respective rights holders; route banners are cropped from Nintendo’s official game page. Fonts: Cinzel &amp; Cormorant Garamond (SIL Open Font License), served from this site. No analytics or third-party scripts.</p>
+  </div>
+</section>
+</main>
+
+<nav class="bottomnav" aria-label="Collection views">
+  <span class="nav-ink" aria-hidden="true"></span>
+  <button data-tab="all" aria-current="page"><svg class="ico" aria-hidden="true"><use href="#i-company"/></svg><span>Company</span></button>
+  <button data-tab="wishlist"><svg class="ico" aria-hidden="true"><use href="#i-star"/></svg><span>Wishlist</span></button>
+  <button data-tab="recruited"><svg class="ico" aria-hidden="true"><use href="#i-seal"/></svg><span>Recruited</span></button>
+  <button data-tab="missables"><svg class="ico" aria-hidden="true"><use href="#i-hourglass"/></svg><span>Missables</span></button>
+  <button data-tab="about"><svg class="ico" aria-hidden="true"><use href="#i-book"/></svg><span>About</span></button>
+</nav>
+
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+<dialog id="missables-detail" class="sheet" aria-labelledby="missables-detail-title">
+  <div class="sheet-grip" aria-hidden="true"><i></i></div>
+  <div class="dialogtop"><span class="eyebrow">Part I · Requirements</span><button id="close-missables" class="closebtn" aria-label="Close scene details"><svg class="ico" aria-hidden="true"><use href="#i-close"/></svg></button></div>
+  <div id="missables-detail-content"></div>
+</dialog>
+<dialog id="detail" class="sheet" aria-labelledby="detail-name">
+  <div class="sheet-grip" aria-hidden="true"><i></i></div>
+  <div class="dialogtop"><span class="eyebrow">Character field note</span><button id="close-detail" class="closebtn" aria-label="Close character details"><svg class="ico" aria-hidden="true"><use href="#i-close"/></svg></button></div>
+  <div id="detail-content"></div>
+</dialog>
+<script src="app.js?v=4" defer></script>
+<script src="missables.js?v=5" defer></script>
+</body>
+</html>
