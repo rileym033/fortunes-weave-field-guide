@@ -1,17 +1,19 @@
 'use strict';
-/* Missables — swipeable lord routes with per-route palettes and checklists. */
+/* Missables — swipeable lord routes with per-route palettes and checklists.
+   Viewed notes and the chosen route live in the active save file. */
 let missables=[],routes=[],routeIndex=0,filterMode='all';
-const missablesStorageKey='theodora-missables-v1';
-const routeStorageKey='theodora-missables-route-v1';
-let viewed=new Set();
-try{
-  const saved=JSON.parse(localStorage.getItem(missablesStorageKey)||'[]');
-  if(!Array.isArray(saved)||!saved.every(k=>typeof k==='string'))throw Error('Invalid checklist');
-  viewed=new Set(saved);
-}catch{$('missables-storage-warning').hidden=false;}
-let savedRoute=null;
-try{savedRoute=localStorage.getItem(routeStorageKey);}catch{}
-FG.getViewed=()=>[...viewed];
+let viewed=new Set(store.profile().viewed);
+let profileId=store.profile().id;
+FG.onProfileChange.push(()=>{
+  const p=store.profile(),switched=p.id!==profileId;
+  profileId=p.id;viewed=new Set(p.viewed);
+  if(!routes.length)return;
+  const i=routes.indexOf(p.route);
+  if(i>=0&&i!==routeIndex)selectRoute(i,{scroll:isMissablesVisible(),animate:false,persist:false});
+  else renderMissables({animate:false});
+  if(switched&&!isMissablesVisible())pendingScrollFix=true;
+});
+let pendingScrollFix=false;
 
 const sceneKey=e=>JSON.stringify([e.route,e.id]);
 const ROMAN=['I','II','III','IV','V','VI','VII','VIII'];
@@ -28,9 +30,10 @@ const track=$('route-carousel'),tabs=$('route-tabs'),pager=$('route-pager'),list
 const currentRoute=()=>routes[routeIndex];
 const routeEntries=route=>missables.filter(e=>e.route===route).sort((a,b)=>a.chapterOrder-b.chapterOrder||a.title.localeCompare(b.title));
 const routeStats=route=>{const rows=routeEntries(route);return{done:rows.filter(e=>viewed.has(sceneKey(e))).length,total:rows.length};};
-const lordPortrait=route=>missables.find(e=>e.owner===route&&typeof e.portrait==='string'&&e.portrait.startsWith('data:image/'))?.portrait;
+const lordPortrait=route=>FG.portrait(route);
 const isMissablesVisible=()=>!$('missables-view').hidden;
-function persistViewed(){try{localStorage.setItem(missablesStorageKey,JSON.stringify([...viewed]));}catch{$('missables-storage-warning').hidden=false;}}
+/* Record one mark at a time so other open tabs merge rather than overwrite. */
+function persistViewed(key,on){store.update(p=>{const s=new Set(p.viewed);if(on)s.add(key);else s.delete(key);p.viewed=[...s];},{quiet:true});}
 
 /* ---------- Stage ---------- */
 function buildStage(){
@@ -79,12 +82,12 @@ function paintParallax(){
   });
 }
 
-function selectRoute(index,{scroll=true,animate=true}={}){
+function selectRoute(index,{scroll=true,animate=true,persist=true}={}){
   index=Math.max(0,Math.min(routes.length-1,index));
   const changed=index!==routeIndex;
   routeIndex=index;
   const route=currentRoute();
-  try{localStorage.setItem(routeStorageKey,route);}catch{}
+  if(persist&&isMissablesVisible()&&store.profile().route!==route)store.update(p=>{p.route=route;},{quiet:true});
   [...tabs.children].forEach((t,i)=>{t.setAttribute('aria-selected',String(i===index));t.tabIndex=i===index?0:-1;});
   [...pager.children].forEach((d,i)=>d.classList.toggle('on',i===index));
   [...track.children].forEach((s,i)=>{
@@ -110,6 +113,7 @@ function scrollToIndex(index,smooth=true){
 
 let scrollRafM=0,settleTimer=0;
 track.addEventListener('scroll',()=>{
+  if(!isMissablesVisible())return;
   if(!scrollRafM)scrollRafM=requestAnimationFrame(()=>{
     scrollRafM=0;paintParallax();
     if(performance.now()<programmaticUntil)return;
@@ -118,6 +122,7 @@ track.addEventListener('scroll',()=>{
   });
   clearTimeout(settleTimer);
   settleTimer=setTimeout(()=>{
+    if(!isMissablesVisible())return;
     programmaticUntil=0;
     const i=Math.round(track.scrollLeft/(track.clientWidth||1));
     if(i!==routeIndex)selectRoute(i,{scroll:false});
@@ -154,6 +159,11 @@ tabs.addEventListener('keydown',e=>{
 
 FG.onMissablesShown=()=>{
   FG.loadMissables();
+  if(routes.length){
+    const i=routes.indexOf(store.profile().route);
+    if(i>=0&&i!==routeIndex)selectRoute(i,{scroll:false,animate:false,persist:false});
+    programmaticUntil=performance.now()+400;pendingScrollFix=false;
+  }
   const route=currentRoute();
   if(route)FG.setTheme(route);
   requestAnimationFrame(()=>{scrollToIndex(routeIndex,false);paintParallax();});
@@ -179,7 +189,7 @@ function renderMissables({animate=true}={}){
   rows.forEach(e=>{const g=groups[groups.length-1];if(g&&g.chapter===e.chapter)g.rows.push(e);else groups.push({chapter:e.chapter,rows:[e]});});
   let i=0;
   list.classList.toggle('no-anim',!animate);
-  list.innerHTML=groups.map(g=>`<section class="chapter-group" aria-label="Chapter ${esc(g.chapter)}"><h3 class="chapter-head"><span>Chapter</span><b class="chapter-num">${esc(g.chapter)}</b><small>${g.rows.length} ${g.rows.length===1?'note':'notes'}</small></h3>${g.rows.map(e=>rowHTML(e,i++)).join('')}</section>`).join('');
+  list.innerHTML=groups.map(g=>`<section class="chapter-group" aria-label="Chapter ${esc(g.chapter)}"><h2 class="chapter-head"><span>Chapter</span><b class="chapter-num">${esc(g.chapter)}</b><small>${g.rows.length} ${g.rows.length===1?'note':'notes'}</small></h2>${g.rows.map(e=>rowHTML(e,i++)).join('')}</section>`).join('');
 }
 function focusFilter(){$('missables-filter').querySelector('[aria-pressed="true"]')?.focus();}
 
@@ -189,7 +199,7 @@ list.addEventListener('change',event=>{
   const entry=row&&missables.find(e=>e.route===currentRoute()&&e.id===row.dataset.id);if(!entry)return;
   const key=sceneKey(entry);
   if(input.checked)viewed.add(key);else viewed.delete(key);
-  persistViewed();
+  persistViewed(key,input.checked);
   row.classList.toggle('is-viewed',input.checked);
   row.classList.remove('just-sealed');
   if(input.checked&&!reduceMotion()){void row.offsetWidth;row.classList.add('just-sealed');}
@@ -221,7 +231,7 @@ function bindDetailToggle(entry){
   $('missables-detail-toggle').onclick=()=>{
     const key=sceneKey(entry),now=!viewed.has(key);
     if(now)viewed.add(key);else viewed.delete(key);
-    persistViewed();
+    persistViewed(key,now);
     renderMissables({animate:false});
     const replacement=[...list.querySelectorAll('.missable-row')].find(r=>r.dataset.id===entry.id);
     activeSceneButton=replacement?.querySelector('.missable-title')||null;
@@ -265,9 +275,9 @@ FG.loadMissables=()=>{
   routes=d.routes.filter(r=>typeof r==='string');
   if(!routes.length)routes=[...new Set(missables.map(e=>e.route))];
   buildStage();
-  const start=routes.indexOf(savedRoute)>=0?routes.indexOf(savedRoute):Math.max(0,routes.indexOf('Theodora'));
+  const want=store.profile().route,start=routes.indexOf(want)>=0?routes.indexOf(want):Math.max(0,routes.indexOf(FG.lord()));
   routeIndex=-1;
-  selectRoute(start,{scroll:false,animate:false});
+  selectRoute(start,{scroll:false,animate:false,persist:false});
   if(isMissablesVisible())FG.onMissablesShown();
   $('missables-coverage').textContent=d.coverageNotes.join(' ');
   filterButtons.forEach(b=>{b.disabled=false;});

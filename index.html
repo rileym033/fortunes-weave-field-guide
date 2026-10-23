@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="">
+<html lang="en" data-theme="" data-lord="Theodora">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -10,11 +10,13 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Field Guide">
 <meta name="format-detection" content="telephone=no">
-<title>Theodora’s Field Guide</title>
+<title>Field Guide · Fortune’s Weave</title>
 <link rel="preload" href="fonts/cinzel-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/cormorant-garamond-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=5">
-<link rel="stylesheet" href="missables.css?v=6">
+<link rel="stylesheet" href="style.css?v=30">
+<link rel="stylesheet" href="missables.css?v=30">
+<link rel="stylesheet" href="v2.css?v=31">
+<link rel="stylesheet" href="fx.css?v=30">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -26,11 +28,14 @@
   <symbol id="i-seal" viewBox="0 0 24 24"><path d="M12 2.6l2.1 1.6 2.6-.2.9 2.5 2.3 1.2-.4 2.6 1.4 2.2-1.4 2.2.4 2.6-2.3 1.2-.9 2.5-2.6-.2L12 21.4l-2.1-1.6-2.6.2-.9-2.5-2.3-1.2.4-2.6L3.1 12l1.4-2.2-.4-2.6 2.3-1.2.9-2.5 2.6.2z"/><path d="m8.4 12.2 2.4 2.4 4.8-5"/></symbol>
   <symbol id="i-hourglass" viewBox="0 0 24 24"><path d="M6.5 3h11M6.5 21h11"/><path d="M8 3c0 4.6 8 5 8 9s-8 4.4-8 9M16 3c0 4.6-8 5-8 9s8 4.4 8 9"/><path d="M10 18.6c.8-.7 3.2-.7 4 0"/></symbol>
   <symbol id="i-book" viewBox="0 0 24 24"><path d="M3 5.4c2.6-1.5 5.6-1.5 9 .6 3.4-2.1 6.4-2.1 9-.6v13.4c-2.6-1.4-5.6-1.4-9 .6-3.4-2-6.4-2-9-.6z"/><path d="M12 6v13.4"/></symbol>
+  <symbol id="i-bond" viewBox="0 0 24 24"><circle cx="8.6" cy="12" r="5.4"/><circle cx="15.4" cy="12" r="5.4"/><path d="M12 8.2c.9.9 1.4 2.2 1.4 3.8s-.5 2.9-1.4 3.8"/></symbol>
+  <symbol id="i-meal" viewBox="0 0 24 24"><path d="M3.5 13.5h17"/><path d="M5 13.5a7 7 0 0 0 14 0"/><path d="M9 20h6"/><path d="M9.5 9.5c0-1.6 1.2-1.6 1.2-3.2S9.5 4.7 9.5 3.4M14.3 9.5c0-1.6 1.2-1.6 1.2-3.2s-1.2-1.6-1.2-2.9"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.2"/><path d="m15.2 15.2 5 5"/></symbol>
   <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2.2"/><circle cx="9" cy="17" r="2.2"/></symbol>
   <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
   <symbol id="i-chev-l" viewBox="0 0 24 24"><path d="m14.5 5-7 7 7 7"/></symbol>
   <symbol id="i-chev-r" viewBox="0 0 24 24"><path d="m9.5 5 7 7-7 7"/></symbol>
+  <symbol id="i-chev-d" viewBox="0 0 24 24"><path d="m5 9.5 7 7 7-7"/></symbol>
   <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></symbol>
   <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M4.8 20.2c1-3.8 3.8-5.7 7.2-5.7s6.2 1.9 7.2 5.7"/></symbol>
   <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3c.6 4.5 2.5 6.4 7 7-4.5.6-6.4 2.5-7 7-.6-4.5-2.5-6.4-7-7 4.5-.6 6.4-2.5 7-7z"/><path d="M18.5 16.5c.2 1.5.8 2.1 2.3 2.3-1.5.2-2.1.8-2.3 2.3-.2-1.5-.8-2.1-2.3-2.3 1.5-.2 2.1-.8 2.3-2.3z"/></symbol>
@@ -41,24 +46,38 @@
   <symbol id="i-restore" viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4.5 4.5v4h4"/></symbol>
   <symbol id="i-coin" viewBox="0 0 24 24"><ellipse cx="12" cy="6.8" rx="7" ry="2.8"/><path d="M5 6.8v5c0 1.6 3.1 2.8 7 2.8s7-1.2 7-2.8v-5M5 11.8v5c0 1.6 3.1 2.8 7 2.8s7-1.2 7-2.8v-5"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.4 4.4L19 7.4"/></symbol>
+  <symbol id="i-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.2"/><path d="m6.2 6.2 11.6 11.6"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17z"/><path d="m14.5 7.5 3 3"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13"/></symbol>
+  <symbol id="i-swap" viewBox="0 0 24 24"><path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20z"/></symbol>
+  <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 21c-3.9 0-6.5-2.6-6.5-6.1 0-3.9 3.6-5.7 4.3-10.4 2.7 1.5 3.9 4.3 3.4 6.8 1-.4 1.7-1.4 2-2.7 2 1.6 3.3 3.9 3.3 6.3 0 3.5-2.6 6.1-6.5 6.1z"/></symbol>
 </svg>
 
 <div class="backdrop" aria-hidden="true"><div class="backdrop-glow"></div><div class="backdrop-ornament"></div></div>
 
 <main id="app">
-<p id="storage-warning" class="warning" role="status" hidden>Browser storage is unavailable. Your marks work for this visit but may not be saved.</p>
+<p id="storage-warning" class="warning" role="status" hidden>This browser is blocking storage, so progress can’t be kept after you close the page. Private Browsing is the usual cause.</p>
 
-<!-- ============ COMPANY / ROSTER ============ -->
+<!-- ============ COMPANY ============ -->
 <section id="roster-view" class="view" aria-labelledby="hero-title">
   <header class="hero" id="hero">
-    <div class="hero-art-wrap" aria-hidden="true"><img class="hero-art" src="art/theodora.webp" alt="" width="860" height="512" decoding="async" fetchpriority="high"></div>
+    <div class="hero-art-wrap" aria-hidden="true"><img class="hero-art" id="hero-art" src="art/theodora.webp" alt="" width="860" height="512" decoding="async" fetchpriority="high"></div>
     <div class="motes" aria-hidden="true"></div>
+    <button class="save-chip" id="save-chip" type="button" aria-haspopup="dialog" aria-controls="files">
+      <span class="save-face"><img id="save-chip-face" src="portraits/theodora.webp" alt="" width="34" height="34"></span>
+      <span class="save-text"><small>Save file</small><b id="save-chip-name">Theodora’s journey</b></span>
+      <span class="save-state bad" id="save-state" hidden><svg class="ico" aria-hidden="true"><use href="#i-close"/></svg><span>Not saved</span></span>
+    </button>
     <div class="hero-copy">
       <p class="eyebrow"><span class="eyebrow-gem" aria-hidden="true"></span>Fire Emblem · Fortune’s Weave</p>
-      <h1 id="hero-title" tabindex="-1"><span class="h1-small">Theodora’s</span><span class="h1-big">Field Guide</span></h1>
+      <h1 id="hero-title" tabindex="-1"><span class="h1-small" id="hero-lord">Theodora’s</span><span class="h1-big">Field Guide</span></h1>
+      <span class="weave-slot" data-weave aria-hidden="true"></span>
       <p class="subtitle">A little preparation. A stronger company.</p>
       <div class="hero-stats" id="hero-stats">
-        <button class="stat" type="button" data-jump="all" aria-label="Show the whole company"><b id="stat-recruitable">—</b><span>Can join</span></button>
+        <button class="stat" type="button" data-jump="joinable" aria-label="Show everyone who can join"><b id="stat-recruitable">—</b><span>Can join</span></button>
         <button class="stat" type="button" data-jump="wishlist" aria-label="Show your wishlist"><b id="stat-wishlist">0</b><span>Wishlist</span></button>
         <button class="stat" type="button" data-jump="recruited" aria-label="Show your recruits"><b id="stat-recruited">0</b><span>Recruited</span></button>
       </div>
@@ -68,13 +87,14 @@
 
   <div class="toolbar" id="roster-toolbar">
     <div class="searchrow">
-      <label class="searchbox"><svg class="ico" aria-hidden="true"><use href="#i-search"/></svg><input id="search" type="search" aria-label="Search characters or materials" placeholder="Name or item" autocomplete="off" enterkeyhint="search"></label>
-      <button id="filters-toggle" class="iconbtn" aria-expanded="false" aria-controls="filters"><svg class="ico" aria-hidden="true"><use href="#i-sliders"/></svg><span>Filters</span><i class="filter-dot" hidden></i></button>
+      <label class="searchbox"><svg class="ico" aria-hidden="true"><use href="#i-search"/></svg><input id="search" type="search" aria-label="Search characters or items. Start a word with a minus sign to exclude it." placeholder="Name or item" autocomplete="off" autocapitalize="off" enterkeyhint="search"></label>
+      <button id="filters-toggle" class="iconbtn" aria-expanded="false" aria-controls="filters"><svg class="ico" aria-hidden="true"><use href="#i-sliders"/></svg><span>Filters</span><i class="filter-count" id="filter-count" hidden></i></button>
     </div>
+    <div id="active-filters" class="active-filters" aria-label="Active filters"></div>
     <div id="filters" class="filters" hidden>
-      <div class="filtergrid">
-        <label>Recruitment<select id="status"><option value="all">All characters</option><option value="yes">Recruitable / automatic</option><option value="optional">Optional recruits</option><option value="auto">Automatic team</option><option value="no">Not recruitable</option></select></label>
-        <label>Support partner<select id="partner"><option value="all">All partners</option><option>Theodora</option><option>Lilian</option><option>Lysander</option><option>Tobias</option><option>Bonaventure</option><option value="none">No team supports listed</option></select></label>
+      <p class="filter-help"><span class="tri-demo inc"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg></span>Tap once: show only <span class="tri-demo exc"><svg class="ico" aria-hidden="true"><use href="#i-ban"/></svg></span>Twice: hide · Third tap clears. In search, <b>−word</b> hides matches.</p>
+      <div id="filter-groups"></div>
+      <div class="filtergrid sortgrid">
         <label>Sort by<select id="sort"><option value="name">Name</option><option value="support">Support level</option><option value="renown">Renown</option><option value="gold">Gold required</option><option value="status">Recruitment status</option><option value="supports">Support partner count</option></select></label>
         <button id="direction" class="ghostbtn">↑ Ascending</button>
       </div>
@@ -83,16 +103,83 @@
   </div>
 
   <div class="listmeta"><h2 id="view-title">The company</h2><span id="count" role="status" aria-live="polite">Opening field notes…</span></div>
-  <p class="legend"><span><b class="rank-gem r-A" aria-hidden="true">A</b> highest listed support scene</span><span>Support lv. = recruitment</span></p>
+  <p class="legend"><span><b class="rank-gem r-A" aria-hidden="true">A</b> highest listed support scene</span><span id="legend-lord">Support lv. = with Theodora</span></p>
   <div id="cards"></div>
   <section id="empty" class="empty" hidden>
     <span class="empty-crest" aria-hidden="true"><svg class="ico"><use href="#i-star"/></svg></span>
     <h2>No field notes here</h2>
-    <p>Try another search or filter. Save characters with the star, or mark them recruited in their details.</p>
+    <p>Try another search or loosen a filter. Star characters for your wishlist, or mark them recruited in their details.</p>
     <button id="empty-reset" class="ghostbtn">Clear search &amp; filters</button>
   </section>
   <p id="load-error" class="warning" hidden>Could not open the roster. Check your connection and reload this page.</p>
   <p class="endnote"><span class="end-orn" aria-hidden="true"></span>Spoiler-filtered · Community reference<br>Tap a portrait or name for requirements.</p>
+</section>
+
+<!-- ============ SUPPORTS ============ -->
+<section id="supports-view" class="view" hidden aria-labelledby="supports-heading">
+  <header class="page-hero" id="supports-hero">
+    <div class="ph-art" aria-hidden="true"><img id="sp-focus-art" src="" alt="" decoding="async"></div>
+    <div class="motes" aria-hidden="true"></div>
+    <div class="ph-copy">
+      <p class="eyebrow"><span class="eyebrow-gem" aria-hidden="true"></span>Support conversations</p>
+      <h1 id="supports-heading" tabindex="-1">Bonds</h1>
+      <span class="weave-slot" data-weave aria-hidden="true"></span>
+      <button class="focus-pick" id="sp-focus" type="button" aria-haspopup="dialog">
+        <span class="pf sm"><img id="sp-focus-face" src="" alt=""></span>
+        <span class="fp-text"><small>Showing bonds of</small><b id="sp-focus-name">—</b></span>
+        <svg class="ico" aria-hidden="true"><use href="#i-swap"/></svg>
+      </button>
+      <div class="ph-stats">
+        <span class="ring-wrap" aria-hidden="true"><svg class="ring" viewBox="0 0 46 46"><circle class="track" cx="23" cy="23" r="18"/><circle class="fill" id="sp-ring" cx="23" cy="23" r="18"/></svg><b id="sp-pct">0%</b></span>
+        <p id="sp-progress" class="lord-count" role="status" aria-live="polite"></p>
+      </div>
+    </div>
+  </header>
+  <div class="cast-wrap"><div class="cast-head"><b>Everyone with bonds</b><small id="sp-cast-count"></small></div>
+    <div class="cast-strip" id="sp-cast" role="group" aria-label="Choose whose bonds to show"></div></div>
+  <p class="note hint"><svg class="ico" aria-hidden="true"><use href="#i-spark"/></svg>Tap a rank once you’ve watched it. Tap a name for what it needs.</p>
+  <div class="toolbar slim" id="supports-toolbar">
+    <div id="sp-filter" class="segmented wide" role="group" aria-label="Show">
+      <button type="button" data-filter="next" aria-pressed="true">Next up</button>
+      <button type="button" data-filter="all" aria-pressed="false">All</button>
+      <button type="button" data-filter="done" aria-pressed="false">Viewed</button>
+    </div>
+    <label class="switch"><input type="checkbox" id="sp-company-only"><span class="sw" aria-hidden="true"></span>In my company</label>
+    <label class="switch"><input type="checkbox" id="sp-part1"><span class="sw" aria-hidden="true"></span>Part I only</label>
+  </div>
+  <div id="sp-list" class="bond-list"></div>
+  <p id="sp-empty" class="empty" hidden></p>
+  <details class="spoiler-links rules-box"><summary>How supports work</summary><ul id="sp-rules" class="rules"></ul></details>
+</section>
+
+<!-- ============ MEALS ============ -->
+<section id="meals-view" class="view" hidden aria-labelledby="meals-heading">
+  <header class="inn-head">
+    <p class="eyebrow"><span class="eyebrow-gem" aria-hidden="true"></span>The inn at Dagsion</p>
+    <h1 id="meals-heading" tabindex="-1">Share a meal</h1>
+    <span class="weave-slot center" data-weave aria-hidden="true"></span>
+    <p class="subtitle">Seat three. Bonds grow between every pair at the table.</p>
+  </header>
+  <div class="table-stage" id="table-stage">
+    <svg class="table-links" id="table-links" viewBox="0 0 300 250" aria-hidden="true"></svg>
+    <div class="table-top" aria-hidden="true"><span class="hearth"><svg class="ico"><use href="#i-flame"/></svg></span></div>
+    <div id="seats"></div>
+  </div>
+  <div id="meal-pairs" class="meal-pairs" aria-live="polite"></div>
+  <section class="meal-block" aria-labelledby="rec-heading">
+    <div class="block-head"><h2 id="rec-heading">Recommended guests</h2><span id="rec-count" class="count-tag"></span></div>
+    <p class="note" id="rec-why"></p>
+    <div class="toolbar slim inline">
+      <label class="switch"><input type="checkbox" id="rec-wishlist"><span class="sw" aria-hidden="true"></span>Wishlist first</label>
+      <label class="switch"><input type="checkbox" id="rec-company"><span class="sw" aria-hidden="true"></span>Hide unrecruitable</label>
+    </div>
+    <div id="rec-list" class="rec-list"></div>
+  </section>
+  <section class="meal-block" id="dish-block" aria-labelledby="dish-heading">
+    <div class="block-head"><h2 id="dish-heading">What to order</h2><span id="dish-count" class="count-tag"></span></div>
+    <div id="dish-list" class="dish-list"></div>
+  </section>
+  <details class="spoiler-links rules-box" id="meal-rules-box"><summary>How meals work</summary><ul id="meal-rules" class="rules"></ul></details>
 </section>
 
 <!-- ============ MISSABLES ============ -->
@@ -106,7 +193,6 @@
   </div>
   <div class="route-tabs-wrap"><div class="route-tabs" id="route-tabs" role="tablist" aria-label="Choose a lord’s route"></div></div>
   <p id="route-status" class="sr-only" aria-live="polite"></p>
-
   <div class="missables-head">
     <p class="eyebrow">Part I · Scenes &amp; Paralogues</p>
     <div class="mh-row">
@@ -116,6 +202,7 @@
         <button type="button" data-filter="unviewed" aria-pressed="false">Unviewed</button>
       </div>
     </div>
+    <span class="weave-slot small" data-weave aria-hidden="true"></span>
     <div class="progress-row">
       <div class="weave-bar" aria-hidden="true"><i id="missables-bar-fill"></i></div>
       <p id="missables-progress" role="status" aria-live="polite"></p>
@@ -126,56 +213,63 @@
   <p id="missables-load-error" class="warning" role="status" hidden>Missables notes are not available. Verified data may not be published yet, or the connection failed. No checklist has been inferred. Reload to try again.</p>
   <div id="missables-list" role="tabpanel" aria-labelledby="missables-heading"></div>
   <p id="missables-empty" class="empty" hidden></p>
-  <p class="note">Check off viewed notes · Saved in this browser only, separately for each route. No cloud sync.</p>
+  <p class="note">Check off viewed notes · Saved automatically in this save file, separately for each route.</p>
   <div id="missables-coverage" class="note coverage"></div>
 </section>
 
-<!-- ============ ABOUT ============ -->
+<!-- ============ MORE / ABOUT ============ -->
 <section id="about" class="view" hidden aria-labelledby="about-title">
   <header class="about-head">
     <span class="crest" aria-hidden="true"><img src="icon.svg" alt="" width="64" height="64"></span>
-    <p class="eyebrow">The small print</p>
+    <p class="eyebrow">Save files &amp; the small print</p>
     <h1 id="about-title" tabindex="-1">A guide, not a spoiler.</h1>
-    <svg class="weave" viewBox="0 0 400 24" preserveAspectRatio="none" aria-hidden="true"><path d="M0 12C50 1 50 23 100 12S150 1 200 12s50 11 100 0 50-11 100 0"/><path d="M0 12C50 23 50 1 100 12s50 11 100 0 50-11 100 0 50 11 100 0"/><circle cx="200" cy="12" r="2.6"/></svg>
+    <span class="weave-slot center" data-weave aria-hidden="true"></span>
   </header>
   <div class="codex">
-    <p>Recruitment notes for Theodora’s initial route, with support partners limited to Theodora, Lilian, Lysander, Tobias &amp; Bonaventure. Major story recruits and story unlock details are excluded.</p>
-    <h3>Your pocket collection</h3>
-    <p>Star a character for your wishlist. Open their field note to mark them recruited. Both lists are independent and saved only in this browser on this device. <strong>No account. No cloud sync.</strong> Clearing website data clears your marks; private browsing may not keep them.</p>
-
-    <div class="backup-card" id="backup">
-      <h3><svg class="ico" aria-hidden="true"><use href="#i-scroll"/></svg>Keep your progress safe</h3>
-      <p>Safari can clear website data for sites you haven’t opened in a while. Copy a backup code now and then — paste it here later to restore your wishlist, recruits and checklist, in this or another browser.</p>
-      <div class="backup-actions">
-        <button id="backup-copy" class="goldbtn" type="button"><svg class="ico" aria-hidden="true"><use href="#i-copy"/></svg>Copy code</button>
-        <button id="backup-restore-toggle" class="ghostbtn" type="button" aria-expanded="false" aria-controls="backup-restore"><svg class="ico" aria-hidden="true"><use href="#i-restore"/></svg>Restore</button>
-      </div>
-      <div id="backup-restore" hidden>
-        <label for="backup-input" class="sr-only">Backup code</label>
-        <textarea id="backup-input" rows="3" placeholder="Paste a backup code…" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
-        <button id="backup-apply" class="goldbtn" type="button">Restore progress</button>
-      </div>
-      <p id="backup-status" class="note" role="status" aria-live="polite"></p>
+    <div class="backup-card" id="files-card">
+      <h2><svg class="ico" aria-hidden="true"><use href="#i-scroll"/></svg>Your save files</h2>
+      <p>Everything you tap saves itself straight away — recruits, wishlist, supports, meals and missables. Each save file is one playthrough with its own lord.</p>
+      <div id="files-inline" class="files-list"></div>
+      <p id="save-health" class="note"></p>
     </div>
 
-    <h3>Add to your iPhone Home Screen</h3>
-    <p>Open this site in Safari, tap Share, then Add to Home Screen (you may need to scroll the menu). This is a hosted guide, not an offline app: a connection is required to load it. No service worker or offline guarantee is provided.</p>
+    <h2>Keep it on your iPhone</h2>
+    <p>Open this site in Safari, tap Share, then <strong>Add to Home Screen</strong>. The Home Screen app keeps its own storage, which iPhone doesn’t tidy away like websites you haven’t visited in a while. A connection is needed to load it.</p>
+
+    <details class="spoiler-links" id="transfer">
+      <summary>Move to another device</summary>
+      <div class="transfer-body">
+        <p>Only needed for a new phone or browser. Copy the code here, then paste it on the other device.</p>
+        <div class="backup-actions">
+          <button id="backup-copy" class="goldbtn" type="button"><svg class="ico" aria-hidden="true"><use href="#i-copy"/></svg>Copy code</button>
+          <button id="backup-restore-toggle" class="ghostbtn" type="button" aria-expanded="false" aria-controls="backup-restore"><svg class="ico" aria-hidden="true"><use href="#i-restore"/></svg>Paste code</button>
+        </div>
+        <div id="backup-restore" hidden>
+          <label for="backup-input" class="sr-only">Transfer code</label>
+          <textarea id="backup-input" rows="3" placeholder="Paste a transfer code…" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+          <button id="backup-apply" class="goldbtn" type="button">Add these save files</button>
+        </div>
+        <p id="backup-status" class="note" role="status" aria-live="polite"></p>
+      </div>
+    </details>
+
     <div id="source-notes">
-      <h3>Reading the field notes</h3>
-      <p><strong>Two different support measures:</strong> “Support lv.” is the numeric recruitment threshold. “Team supports” lists maximum conversation ranks (A/B/C), not recruitment levels and not a promise that every lower-rank scene exists. Scene availability can depend on progression or viewing order; those details are deliberately withheld.</p>
-      <p><strong>Coverage:</strong> the same 46 NPCs as the spreadsheet, including four automatic companions and NPCs unavailable on this initial lord route. The four selectable lords are not roster rows. “No” applies to recruitment on this initial route, not later-story availability. Supports listed for unavailable NPCs are reference data, not a claim they can join this team now.</p>
-      <p><strong>Uncertainty:</strong> “No team supports listed” means the community matrix records none with these five teammates—not independently proven absence. Rank entries were checked against the community matrix and support tracker; both share source material, so this is not independent in-game verification. Recruitment thresholds were compared between two guides. Sofia’s tutorial thresholds come from the more detailed guide. The conflicting Kiroc availability date is not asserted.</p>
-      <p><strong>Items:</strong> quantities are explicit when available; unspecified quest-item quantities are not guessed. Item types are plain-language labels. “None listed” does not rule out quest-related costs; “—” means not applicable. Gold sorting uses the minimum stated cost and places no-listed-cost entries at zero, with not-applicable entries last.</p>
+      <h2>Reading the field notes</h2>
+      <p><strong>Every lord, one roster:</strong> the Company page shows requirements for your save file’s lord. Each character’s field note also compares all four lords. Major story recruits and story unlock details are excluded.</p>
+      <p><strong>Two different support measures:</strong> “Support lv.” is the numeric level a character needs with your lord to be recruited. Support conversations (C, B, A) are scenes between two characters; the guide lists the highest rank the community matrix records, not a promise that every lower rank exists.</p>
+      <p><strong>Requirements are deliberately vague.</strong> Unlock hints say what kind of thing is needed — a support level, both characters in your company, or “a later story point” — never what happens.</p>
+      <p><strong>Uncertainty:</strong> support data comes from a community matrix and tracker that share sources, so it isn’t independent in-game verification. Recruitment thresholds were compared between two guides; disagreements are marked in each field note. Meal preferences are community-reported.</p>
       <details class="spoiler-links">
         <summary>Source links — <em>these pages contain spoilers</em></summary>
-        <ul class="link-list">
+        <ul class="link-list" id="source-links">
           <li><a href="https://serenesforest.net/fortunes-weave/characters/recruitment/" target="_blank" rel="noopener noreferrer">Recruitment: Serenes Forest</a></li>
           <li><a href="https://www.rpgsite.net/guide/21391-fire-emblem-fortunes-weave-recruitment-guide-all-characters-in-game-how-to-recruit-them" target="_blank" rel="noopener noreferrer">RPG Site</a></li>
           <li><a href="https://docs.google.com/spreadsheets/d/18nxc2rXK4Im-9gPyUlLaDI3BkjNH8y77RNjhuRbgOBo/" target="_blank" rel="noopener noreferrer">Community support matrix</a></li>
           <li><a href="https://fortunes-weave-supports.vercel.app/" target="_blank" rel="noopener noreferrer">Support tracker</a></li>
           <li><a href="https://game8.co/games/Fire-Emblem-Fortunes-Weave/archives/619779" target="_blank" rel="noopener noreferrer">Portrait source: Game8</a></li>
+          <li><a href="https://fortunesweave.online/supports/" target="_blank" rel="noopener noreferrer">Support locations &amp; padlocks</a></li>
+          <li><a href="https://dotesports.com/nintendo/guides/fire-emblem-fortunes-weave-support-farming" target="_blank" rel="noopener noreferrer">Meals &amp; support farming</a></li>
         </ul>
-        <p>Tracker lists its data check as 2026-10-15.</p>
       </details>
     </div>
     <p class="endnote">Unofficial fan reference. Character artwork belongs to its respective rights holders; route banners are cropped from Nintendo’s official game page. Fonts: Cinzel &amp; Cormorant Garamond (SIL Open Font License), served from this site. No analytics or third-party scripts.</p>
@@ -183,13 +277,13 @@
 </section>
 </main>
 
-<nav class="bottomnav" aria-label="Collection views">
+<nav class="bottomnav" aria-label="Guide sections">
   <span class="nav-ink" aria-hidden="true"></span>
   <button data-tab="all" aria-current="page"><svg class="ico" aria-hidden="true"><use href="#i-company"/></svg><span>Company</span></button>
-  <button data-tab="wishlist"><svg class="ico" aria-hidden="true"><use href="#i-star"/></svg><span>Wishlist</span></button>
-  <button data-tab="recruited"><svg class="ico" aria-hidden="true"><use href="#i-seal"/></svg><span>Recruited</span></button>
+  <button data-tab="supports"><svg class="ico" aria-hidden="true"><use href="#i-bond"/></svg><span>Supports</span></button>
+  <button data-tab="meals"><svg class="ico" aria-hidden="true"><use href="#i-meal"/></svg><span>Meals</span></button>
   <button data-tab="missables"><svg class="ico" aria-hidden="true"><use href="#i-hourglass"/></svg><span>Missables</span></button>
-  <button data-tab="about"><svg class="ico" aria-hidden="true"><use href="#i-book"/></svg><span>About</span></button>
+  <button data-tab="about"><svg class="ico" aria-hidden="true"><use href="#i-book"/></svg><span>More</span></button>
 </nav>
 
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
@@ -204,7 +298,33 @@
   <div class="dialogtop"><span class="eyebrow">Character field note</span><button id="close-detail" class="closebtn" aria-label="Close character details"><svg class="ico" aria-hidden="true"><use href="#i-close"/></svg></button></div>
   <div id="detail-content"></div>
 </dialog>
-<script src="app.js?v=4" defer></script>
-<script src="missables.js?v=5" defer></script>
+<dialog id="pair" class="sheet" aria-labelledby="pair-title">
+  <div class="sheet-grip" aria-hidden="true"><i></i></div>
+  <div class="dialogtop"><span class="eyebrow">Support conversation</span><button id="close-pair" class="closebtn" aria-label="Close support details"><svg class="ico" aria-hidden="true"><use href="#i-close"/></svg></button></div>
+  <div id="pair-content"></div>
+</dialog>
+<dialog id="picker" class="sheet tall" aria-labelledby="picker-title">
+  <div class="sheet-grip" aria-hidden="true"><i></i></div>
+  <div class="dialogtop"><span class="eyebrow" id="picker-title">Choose a character</span><button id="close-picker" class="closebtn" aria-label="Close character picker"><svg class="ico" aria-hidden="true"><use href="#i-close"/></svg></button></div>
+  <label class="searchbox picker-search"><svg class="ico" aria-hidden="true"><use href="#i-search"/></svg><input id="picker-search" type="search" aria-label="Find a character" placeholder="Find a character" autocomplete="off" autocapitalize="off"></label>
+  <div id="picker-grid" class="picker-grid"></div>
+</dialog>
+<dialog id="files" class="sheet" aria-labelledby="files-title">
+  <div class="sheet-grip" aria-hidden="true"><i></i></div>
+  <div class="dialogtop"><span class="eyebrow" id="files-title">Save files</span><button id="close-files" class="closebtn" aria-label="Close save files"><svg class="ico" aria-hidden="true"><use href="#i-close"/></svg></button></div>
+  <p class="note files-lead">Saved automatically — nothing to press. Tap a file to continue it.</p>
+  <div id="files-list" class="files-list"></div>
+  <div class="new-file">
+    <span class="weave-slot small center" data-weave="plain" aria-hidden="true"></span>
+    <h3>Start a new playthrough</h3>
+    <div class="lord-pick" id="new-file-lords"></div>
+  </div>
+</dialog>
+<script src="store.js?v=30"></script>
+<script src="fx.js?v=30" defer></script>
+<script src="app.js?v=31" defer></script>
+<script src="supports.js?v=31" defer></script>
+<script src="meals.js?v=30" defer></script>
+<script src="missables.js?v=30" defer></script>
 </body>
 </html>

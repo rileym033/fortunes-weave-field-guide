@@ -75,7 +75,7 @@
 .mh-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
 #missables-heading{margin:0;font:600 31px/1.05 var(--display);color:var(--ivory)}
 .segmented{display:inline-flex;padding:3px;border-radius:999px;border:1px solid var(--line);background:rgba(0,0,0,.28)}
-.segmented button{min-height:44px;padding:0 13px;border:0;border-radius:999px;background:none;color:#d2c6a8;font:600 11px/1 var(--caps);letter-spacing:.08em;text-transform:uppercase;transition:all .3s var(--ease-out)}
+.segmented button{min-height:44px;min-width:44px;padding:0 13px;border:0;border-radius:999px;background:none;color:#d2c6a8;font:600 11px/1 var(--caps);letter-spacing:.08em;text-transform:uppercase;transition:all .3s var(--ease-out)}
 .segmented button[aria-pressed="true"]{color:#1b1306;background:linear-gradient(180deg,#f6e3a8,#d6b05e);box-shadow:0 4px 12px -4px rgba(226,194,122,.7)}
 .progress-row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px;margin-top:14px}
 #missables-progress{margin:0;font:600 11px/1 var(--caps);letter-spacing:.1em;text-transform:uppercase;color:var(--gold-hi);white-space:nowrap}
