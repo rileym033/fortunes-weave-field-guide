@@ -122,7 +122,8 @@ main{position:relative;z-index:1;max-width:1080px;margin:0 auto;padding:0 var(--
 .toolbar{position:sticky;top:env(safe-area-inset-top);z-index:8;margin:0 calc(-1*var(--gutter));padding:10px var(--gutter);
   border-bottom:1px solid transparent;transition:border-color .3s,box-shadow .3s,background-color .3s}
 .toolbar.stuck{background:color-mix(in oklab,var(--bg-0) 84%,transparent);-webkit-backdrop-filter:blur(16px) saturate(1.3);backdrop-filter:blur(16px) saturate(1.3);border-bottom-color:var(--line);box-shadow:0 12px 24px -18px #000}
-.toolbar:has(#filters:not([hidden])){background:color-mix(in oklab,var(--bg-0) 90%,transparent);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
+/* An open filter panel is taller than a small phone, so it scrolls with the page instead of sticking. */
+.toolbar:has(#filters:not([hidden])){position:relative;top:auto;background:color-mix(in oklab,var(--bg-0) 90%,transparent);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
 .stat b,.numbers b,.medal b,.chapter-num,.lord-count b,.ring-wrap b,#count,#missables-progress{font-variant-numeric:lining-nums tabular-nums}
 .searchrow{display:flex;gap:8px}
 .searchbox{display:flex;align-items:center;gap:9px;flex:1;min-width:0;padding:0 13px;border-radius:15px;border:1px solid var(--line);
@@ -193,7 +194,7 @@ select option{background:#0b272b;color:#efe6cf}
 .chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 15px 15px 97px}
 .chip{display:inline-flex;align-items:center;gap:7px;padding:3px 4px 3px 10px;border-radius:999px;border:1px solid rgba(226,194,122,.2);background:rgba(255,240,200,.05);font:500 12px/1.3 var(--ui);color:var(--text);white-space:nowrap}
 .unknown{font:italic 600 14px/1.3 var(--display);color:var(--muted)}
-.rank-gem{display:inline-grid;place-items:center;width:19px;height:19px;font:700 9.5px/1 var(--caps);color:#1b1306;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);flex:none}
+.rank-gem{display:inline-grid;place-items:center;width:22px;height:22px;font:700 11px/1 var(--caps);color:#1b1306;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);flex:none}
 .r-A{background:linear-gradient(160deg,#fff4cf,#e7c779 50%,#a9843f)}
 .r-B{background:linear-gradient(160deg,#ffffff,#cdd5df 50%,#8a94a4)}
 .r-C{background:linear-gradient(160deg,#ffe0c2,#cf9161 50%,#8a5530)}
@@ -264,14 +265,15 @@ dialog.sheet::before{content:"";position:absolute;inset:0 0 auto 0;height:220px;
 
 /* Character detail */
 .detailhero{position:relative;display:flex;align-items:center;gap:18px;margin:14px 0 18px}
+.detailhero>div{min-width:0}
 .detailhero::before{content:"";position:absolute;left:-30px;top:-40px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,color-mix(in oklab,var(--glow-2) 32%,transparent),transparent 70%);pointer-events:none}
 .detailhero .pf{width:100px;height:122px;border-radius:16px}
 .detailhero .pf img{border-radius:14px}
-#detail-name{margin:0 0 4px;font:700 36px/1 var(--display);color:var(--ivory)}
-.medallions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.medal{display:flex;align-items:center;gap:12px;padding:12px;border-radius:16px;border:1px solid var(--line);background:linear-gradient(160deg,rgba(255,240,200,.07),rgba(255,240,200,.015))}
+#detail-name{margin:0 0 4px;font:700 36px/1 var(--display);color:var(--ivory);overflow-wrap:anywhere}
+.medallions{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.medal{display:flex;align-items:center;gap:10px;min-width:0;padding:12px 10px;border-radius:16px;border:1px solid var(--line);background:linear-gradient(160deg,rgba(255,240,200,.07),rgba(255,240,200,.015))}
 .medal b{display:grid;place-items:center;width:46px;height:46px;flex:none;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);background:var(--gold-grad);font:700 22px/1 var(--display);color:#1b1306}
-.medal span{font:600 11px/1.3 var(--ui);letter-spacing:.05em;text-transform:uppercase;color:#d2c6a8}
+.medal span{min-width:0;overflow-wrap:anywhere;font:600 11px/1.3 var(--ui);letter-spacing:.05em;text-transform:uppercase;color:#d2c6a8}
 .facts{margin:20px 0 6px}
 .facts dt{display:flex;align-items:center;gap:8px;margin-top:16px;font:600 11px/1.1 var(--caps);letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
 .facts dt .ico{width:16px;height:16px}
@@ -296,11 +298,11 @@ dialog.sheet::before{content:"";position:absolute;inset:0 0 auto 0;height:220px;
 .weave circle{fill:var(--gold-hi)}
 .codex{max-width:660px;margin:18px auto 0}
 .codex p{font-size:15px;line-height:1.75;color:#e4dac2}
-.codex h3{display:flex;align-items:center;gap:10px;font:600 25px/1.15 var(--display);color:var(--gold-hi);margin:30px 0 10px}
+.codex h2,.codex h3{display:flex;align-items:center;gap:10px;font:600 25px/1.15 var(--display);color:var(--gold-hi);margin:30px 0 10px}
 .codex strong{color:var(--ivory)}
 .backup-card{margin:26px 0;padding:18px;border-radius:20px;border:1px solid var(--line-2);background:linear-gradient(160deg,rgba(255,240,200,.08),rgba(255,240,200,.015)),var(--card);box-shadow:inset 0 1px 0 rgba(255,241,196,.1),0 0 40px -24px var(--gold)}
-.backup-card h3{margin-top:0}
-.backup-card h3 .ico{width:26px;height:26px;color:var(--gold)}
+.backup-card h2,.backup-card h3{margin-top:0}
+.backup-card h2 .ico,.backup-card h3 .ico{width:26px;height:26px;color:var(--gold)}
 .backup-actions{display:flex;flex-wrap:wrap;gap:10px}
 .backup-actions .goldbtn{flex:1 1 160px}
 .backup-actions button{white-space:nowrap}
