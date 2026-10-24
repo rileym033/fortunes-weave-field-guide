@@ -80,7 +80,7 @@ FG.wireSheet=(dialog,closeButton,onClose)=>{
 /* ---------- Data ---------- */
 const D=FG.data={roster:null,supports:null,meals:null,byName:new Map(),pairs:new Map(),partners:new Map()};
 /* Bumped with each data release so phones never pair new code with cached old data. */
-const DATA_V='33';
+const DATA_V='37';
 FG.DATA_V=DATA_V;
 const getJSON=url=>fetch(`${url}?v=${DATA_V}`).then(r=>{if(!r.ok)throw Error(url);return r.json();});
 FG.pairKey=(a,b)=>a<b?`${a}|${b}`:`${b}|${a}`;
@@ -89,20 +89,69 @@ FG.portrait=name=>D.byName.get(name)?.portrait||D.roster?.lordPortraits?.[name]|
 FG.isLord=name=>LORDS.includes(name);
 FG.lord=()=>store.profile().lord;
 FG.team=(lord=FG.lord())=>D.roster?.teams?.[lord]||[];
-FG.routeOf=(name,lord=FG.lord())=>D.byName.get(name)?.routes?.[lord]||null;
-FG.everyone=()=>[...LORDS,...(D.roster?.characters||[]).map(c=>c.name)];
+/* A later-story character's recruitment stays sealed until the journey reaches the Part where they can join. */
+const sealedRecruit=c=>c?.recruitPart!=null&&store.journey().part<c.recruitPart;
+const SEALED_RT={status:'Sealed',sealed:true,support:null,renown:null,materials:'—',gold:'—',steps:[],find:null,window:'Sealed until later in your journey'};
+FG.routeOf=(name,lord=FG.lord())=>{const c=D.byName.get(name),rt=c?.routes?.[lord]||null;return rt&&sealedRecruit(c)?SEALED_RT:rt;};
+/* ---------- Journey gates (shared by every save file) ---------- */
+const ROMAN_PART=['Prologue','Part I','Part II','Part III'];
+FG.partName=n=>ROMAN_PART[n]||`Part ${n}`;
+FG.journey=()=>store.journey();
+/* Later-story characters stay out of every list until the journey reaches the point where you meet them. */
+FG.revealed=(name,j=store.journey())=>{
+  const r=D.byName.get(name)?.reveal;if(!r)return true;
+  if(j.part!==r.part)return j.part>r.part;
+  return !r.path||j.paths.includes(r.path);
+};
+FG.characters=(j=store.journey())=>(D.roster?.characters||[]).filter(c=>FG.revealed(c.name,j));
+FG.everyone=()=>[...LORDS,...FG.characters().map(c=>c.name)];
+/* Is a support rank open at this point of the journey? null = open; otherwise why not (short + long text). */
+FG.rankGate=(pr,r,j=store.journey(),lord=FG.lord())=>{
+  const g=pr.gates?.[r]||{},min=g.minPart??pr.parts?.[r]??1,P=FG.partName;
+  const rules=D.supports?.viewing||{};
+  if(j.part<min)return{short:`opens in ${P(min)}`,text:`Opens in ${P(min)}`};
+  if(g.maxPart!=null&&j.part>g.maxPart)return{short:`closed after ${P(g.maxPart)}`,text:`Only viewable up to ${P(g.maxPart)}`};
+  if(Array.isArray(rules.closedParts)&&rules.closedParts.includes(j.part))return{short:`not during ${P(j.part)}`,text:`Conversations can’t be viewed during ${P(j.part)}`};
+  if(g.path&&j.part===1&&lord!==g.path)return{short:`${g.path}’s path only`,text:`Only on ${g.path}’s path`};
+  if(g.paths&&j.part===1&&!g.paths.includes(lord)){const t=g.paths.map(l=>`${l}’s`).join(' or ');return{short:`${t} path only`,text:`Only on ${t} path`};}
+  if(g.notPath&&j.part===1&&lord===g.notPath)return{short:`not on ${lord}’s path`,text:`Not viewable on ${lord}’s path`};
+  if(g.pathComplete&&!j.paths.includes(g.pathComplete))return{short:`after ${g.pathComplete}’s path`,text:`After completing ${g.pathComplete}’s path`};
+  if(g.warLord&&j.part>=2&&j.warLord!==g.warLord)return{short:`${g.warLord} leading Part II`,text:`Only with ${g.warLord} leading Part II`};
+  return null;
+};
+/* Visible pairs only: both characters revealed and the pair itself not sealed. */
+FG.rebuildPartners=()=>{
+  D.partners=new Map();
+  if(!D.supports)return;
+  const j=store.journey();
+  D.supports.pairs.forEach(p=>{
+    if(!FG.revealed(p.a,j)||!FG.revealed(p.b,j))return;
+    for(const [x,y] of [[p.a,p.b],[p.b,p.a]]){if(!D.partners.has(x))D.partners.set(x,[]);D.partners.get(x).push(y);}
+  });
+  const o=FG.orderIndex;D.partners.forEach(list=>list.sort((a,b)=>o(a)-o(b)));
+};
+/* The game's own unit order ("Details" sort). Unknown names fall back to the end, alphabetically. */
+FG.orderIndex=name=>{const i=D.order?.get(name);return i===undefined?1e4:i;};
+FG.byGameOrder=(a,b)=>FG.orderIndex(a)-FG.orderIndex(b)||a.localeCompare(b);
+/* Who is automatically in a lord's army when a new save file starts. */
+FG.startingTeam=lord=>{
+  const auto=D.roster?.startingParty?.[lord];
+  if(Array.isArray(auto))return auto.filter(n=>D.byName.has(n));
+  return[...new Set([...FG.team(lord),...(D.roster?.characters||[]).filter(c=>/automatic team/i.test(c.routes[lord]?.status||'')).map(c=>c.name)])];
+};
 /* In your company = your lord, their starting team, or someone you marked recruited. */
 FG.inCompany=(name,p=store.profile())=>name===p.lord||FG.team(p.lord).includes(name)||p.recruited.includes(name);
 FG.seen=(a,b)=>store.supports()[FG.pairKey(a,b)]?.seen||[];
 FG.nextRank=(a,b)=>{const pr=FG.pair(a,b);if(!pr)return null;const s=FG.seen(a,b);return pr.ranks.find(r=>!s.includes(r))||null;};
 FG.RANK_LEVEL=RANK_LEVEL;
+/* Some conversations list their own support level; otherwise C/B/A open at 2/3/4. */
+FG.rankLevel=(pr,r)=>pr?.levels?.[r]||RANK_LEVEL[r];
 FG.ready=Promise.all([getJSON('data/roster.json'),getJSON('data/supports.json')]).then(([roster,supports])=>{
   D.roster=roster;D.supports=supports;
   roster.characters.forEach(c=>D.byName.set(c.name,c));
-  supports.pairs.forEach(p=>{
-    D.pairs.set(FG.pairKey(p.a,p.b),p);
-    for(const [x,y] of [[p.a,p.b],[p.b,p.a]]){if(!D.partners.has(x))D.partners.set(x,[]);D.partners.get(x).push(y);}
-  });
+  D.order=new Map((roster.order||[]).map((n,i)=>[n,i]));
+  supports.pairs.forEach(p=>D.pairs.set(FG.pairKey(p.a,p.b),p));
+  FG.rebuildPartners();
 });
 FG.mealsReady=null;
 FG.loadMeals=()=>FG.mealsReady||(FG.mealsReady=getJSON('data/meals.json').then(m=>{D.meals=m;return m;}).catch(()=>{D.meals=null;return null;}));
@@ -110,10 +159,10 @@ FG.loadMeals=()=>FG.mealsReady||(FG.mealsReady=getJSON('data/meals.json').then(m
 /* ---------- Company: tri-state filters ---------- */
 let tab='all',ascending=true,activeName=null;
 const filterState=new Map();               // "group:key" -> 'inc' | 'exc'
-const statusKey=rt=>!rt?'unknown':rt.status==='Yes'?'optional':rt.status==='No'?'no':rt.status==='Prologue'?'prologue':rt.status==='Later'?'later':/tutorial/i.test(rt.status)?'tutorial':'auto';
-const STATUS_LABEL={optional:'Optional recruit',auto:'Automatic team',tutorial:'Tutorial recruit',prologue:'Prologue companion',later:'Later recruit',no:'Not recruitable',unknown:'No data for this route'};
-const STATUS_SHORT={optional:'Optional',auto:'Team',tutorial:'Tutorial',prologue:'Prologue',later:'Later',no:'No',unknown:'—'};
-const STATUS_CLASS={optional:'s-optional',auto:'s-auto',tutorial:'s-tutorial',prologue:'s-auto',later:'s-tutorial',no:'s-no',unknown:'s-no'};
+const statusKey=rt=>!rt?'unknown':rt.sealed?'sealed':rt.status==='Yes'?'optional':rt.status==='No'?'no':rt.status==='Prologue'?'prologue':rt.status==='Later'?'later':/tutorial/i.test(rt.status)?'tutorial':'auto';
+const STATUS_LABEL={optional:'Optional recruit',auto:'Automatic team',tutorial:'Tutorial recruit',prologue:'Prologue companion',later:'Later recruit',no:'Not recruitable',sealed:'Recruitment sealed',unknown:'No data for this route'};
+const STATUS_SHORT={optional:'Optional',auto:'Team',tutorial:'Tutorial',prologue:'Prologue',later:'Later',no:'No',sealed:'Sealed',unknown:'—'};
+const STATUS_CLASS={optional:'s-optional',auto:'s-auto',tutorial:'s-tutorial',prologue:'s-auto',later:'s-tutorial',no:'s-no',sealed:'s-no',unknown:'s-no'};
 FG.statusKey=statusKey;FG.STATUS_LABEL=STATUS_LABEL;FG.STATUS_CLASS=STATUS_CLASS;
 const hasItems=rt=>!!rt&&!!rt.materials&&!/^(none listed|—|-)$/i.test(rt.materials.trim());
 const hasGold=rt=>!!rt&&/\d/.test(rt.gold||'');
@@ -144,7 +193,7 @@ function renderActiveFilters(){
   const terms=$('search').value.trim().split(/\s+/).filter(t=>/^[-−]./.test(t));
   $('active-filters').innerHTML=chips.join('')+(chips.length>1?'<button type="button" class="af clear" data-clear="*">Clear all</button>':'');
   $('active-filters').hidden=!chips.length;
-  const n=chips.length+terms.length+($('sort').value!=='name'||!ascending?1:0);
+  const n=chips.length+terms.length+($('sort').value!=='game'||!ascending?1:0);
   $('filter-count').hidden=!n;$('filter-count').textContent=n;
 }
 $('filter-groups').addEventListener('click',e=>{
@@ -164,6 +213,7 @@ $('active-filters').addEventListener('click',e=>{
 
 function sortValue(c,key){
   const rt=FG.routeOf(c.name);
+  if(key==='game')return FG.orderIndex(c.name);
   if(key==='name')return c.name;
   if(key==='supports')return[FG.lord(),...FG.team()].filter(n=>n!==c.name&&FG.pair(c.name,n)).length;
   if(key==='gold'){if(!rt||rt.gold==='—')return null;const m=String(rt.gold).replaceAll(',','').match(/\d+/);return m?Number(m[0]):0;}
@@ -175,7 +225,7 @@ function filtered(){
   const words=$('search').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const inc=words.filter(w=>!/^[-−]/.test(w)),exc=words.filter(w=>/^[-−]./.test(w)).map(w=>w.slice(1));
   const groups=filterGroups(),key=$('sort').value;
-  return D.roster.characters.filter(c=>{
+  return FG.characters().filter(c=>{
     const rt=FG.routeOf(c.name),hay=`${c.name} ${rt?.materials||''}`.toLowerCase();
     if(inc.some(w=>!hay.includes(w)))return false;
     if(exc.some(w=>hay.includes(w)))return false;
@@ -187,10 +237,10 @@ function filtered(){
     return true;
   }).sort((a,b)=>{
     const av=sortValue(a,key),bv=sortValue(b,key);
-    if(av==null&&bv==null)return a.name.localeCompare(b.name);
+    if(av==null&&bv==null)return FG.byGameOrder(a.name,b.name);
     if(av==null)return 1;if(bv==null)return -1;
     const c=typeof av==='number'?av-bv:String(av).localeCompare(String(bv));
-    return c*(ascending?1:-1)||a.name.localeCompare(b.name);
+    return c*(ascending?1:-1)||FG.byGameOrder(a.name,b.name);
   });
 }
 const rankGem=(rank,done=false)=>`<b class="rank-gem r-${/^[ABCS]$/.test(rank)?rank:'A'}${done?' done':''}">${esc(rank)}</b>`;
@@ -202,9 +252,10 @@ function teamChips(name){
 }
 const sealBadge='<span class="seal-badge" aria-hidden="true"><svg class="ico"><use href="#i-seal"/></svg></span>';
 function cardHTML(c,i){
-  const p=store.profile(),rt=FG.routeOf(c.name),sk=statusKey(rt),wished=p.wishlist.includes(c.name),recruited=p.recruited.includes(c.name);
-  return `<article class="card${recruited?' is-recruited':''}" data-name="${esc(c.name)}" style="--i:${i}">`+
-    `<button class="open-card" data-open="${esc(c.name)}" aria-label="View ${esc(c.name)} details">`+
+  const p=store.profile(),rt=FG.routeOf(c.name),sk=statusKey(rt),wished=p.wishlist.includes(c.name),recruited=p.recruited.includes(c.name),picked=selecting&&selected.has(c.name);
+  return `<article class="card${recruited?' is-recruited':''}${picked?' is-picked':''}" data-name="${esc(c.name)}" style="--i:${i}">`+
+    `<button class="open-card" data-open="${esc(c.name)}" ${selecting?`aria-pressed="${picked}" aria-label="Select ${esc(c.name)}"`:`aria-label="View ${esc(c.name)} details"`}>`+
+      (selecting?`<span class="pick-mark" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span>`:'')+
       `<span class="pf"><img src="${esc(c.portrait)}" alt="" width="68" height="82" loading="lazy" decoding="async">${recruited?sealBadge:''}</span>`+
       `<span class="cardtext"><span class="card-name">${esc(c.name)}</span><span class="status ${STATUS_CLASS[sk]}">${STATUS_LABEL[sk]}</span>${recruited?'<span class="recruited-mark"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Recruited</span>':''}`+
       `<span class="numbers"><span>Support lv.<b>${rt?.support??'—'}</b></span><span>Renown<b>${rt?.renown??'—'}</b></span></span></span>`+
@@ -216,8 +267,10 @@ function render({animate=true}={}){
   if(!D.roster)return;
   const rows=filtered(),cards=$('cards');
   cards.classList.toggle('no-anim',!animate);
+  cards.classList.toggle('selecting',selecting);
   cards.innerHTML=rows.map(cardHTML).join('');
-  $('count').textContent=`${rows.length} of ${D.roster.characters.length}`;
+  if(selecting)paintBulk(rows);
+  $('count').textContent=`${rows.length} of ${FG.characters().length}`;
   $('empty').hidden=rows.length!==0;
   $('direction').textContent=ascending?'↑ Ascending':'↓ Descending';
   renderActiveFilters();
@@ -238,14 +291,14 @@ function updateHero(){
   $('save-chip-face').src=FG.portrait(lord);
   $('legend-lord').textContent=`Support lv. = with ${lord}`;
   if(!D.roster)return;
-  const joinable=D.roster.characters.filter(c=>{const rt=FG.routeOf(c.name);return rt&&rt.status!=='No';});
+  const joinable=FG.characters().filter(c=>{const rt=FG.routeOf(c.name);return rt&&rt.status!=='No'&&!rt.sealed;});
   FG.countTo($('stat-recruitable'),joinable.length);
   FG.countTo($('stat-wishlist'),p.wishlist.length);
   FG.countTo($('stat-recruited'),p.recruited.length);
   const done=joinable.filter(c=>p.recruited.includes(c.name)).length;
   $('hero-bar-fill').style.setProperty('--p',(joinable.length?done/joinable.length*100:0)+'%');
 }
-function reset(){$('search').value='';filterState.clear();$('sort').value='name';ascending=true;$('view-title').textContent='The company';renderFilterGroups();render();}
+function reset(){$('search').value='';filterState.clear();$('sort').value='game';ascending=true;$('view-title').textContent='The company';renderFilterGroups();render();}
 $('search').addEventListener('input',()=>render({animate:false}));
 $('sort').addEventListener('change',()=>render());
 $('direction').onclick=()=>{ascending=!ascending;render();};
@@ -265,13 +318,14 @@ function moveInk(){
   if(!ink.classList.contains('ready'))requestAnimationFrame(()=>ink.classList.add('ready'));
 }
 function setTab(next,moveFocus=false){
+  if(next!=='all'&&selecting)setSelecting(false);
   tab=next;
   document.querySelectorAll('.bottomnav [data-tab]').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
   Object.entries(VIEWS).forEach(([k,id])=>{$(id).hidden=k!==tab;});
   if(tab==='missables')FG.onMissablesShown?.();else FG.setTheme(FG.lord());
   if(tab==='supports')FG.onSupportsShown?.();
   if(tab==='meals')FG.onMealsShown?.();
-  if(tab==='about')renderFiles();
+  if(tab==='about'){renderFiles();FG.onJourneyShown?.();}
   if(tab==='all')render();
   moveInk();window.scrollTo(0,0);
   const cur=document.querySelector('.bottomnav [aria-current]');if(cur&&!reduceMotion()){cur.classList.remove('hop');void cur.offsetWidth;cur.classList.add('hop');}
@@ -307,6 +361,13 @@ addEventListener('scroll',()=>{
 /* ---------- Cards ---------- */
 $('cards').addEventListener('click',e=>{
   const star=e.target.closest('.star'),open=e.target.closest('[data-open]');
+  if(selecting&&open){
+    const name=open.dataset.open,card=open.closest('.card'),on=!selected.has(name);
+    if(on)selected.add(name);else selected.delete(name);
+    card.classList.toggle('is-picked',on);open.setAttribute('aria-pressed',String(on));
+    if(on&&!reduceMotion()){card.classList.remove('pick-pop');void card.offsetWidth;card.classList.add('pick-pop');}
+    FG.haptic?.();paintBulk();return;
+  }
   if(star){
     const name=star.closest('.card').dataset.name,added=store.toggle('wishlist',name);
     const next=[...document.querySelectorAll('.card')].find(c=>c.dataset.name===name)?.querySelector('.star');
@@ -316,15 +377,62 @@ $('cards').addEventListener('click',e=>{
 });
 $('view-title').tabIndex=-1;
 
+/* ---------- Company: select several cards and update them at once ---------- */
+let selecting=false;const selected=new Set();
+function paintBulk(rows){
+  const shown=rows||filtered();
+  const n=selected.size,bar=$('bulk-bar');
+  $('bulk-count').textContent=n?`${n} selected`:'Tap cards to select';
+  $('bulk-all').textContent=shown.length&&shown.every(c=>selected.has(c.name))?'Clear':'All shown';
+  bar.querySelectorAll('[data-bulk]').forEach(b=>{b.disabled=!n;});
+}
+function setSelecting(on){
+  selecting=on;selected.clear();
+  $('select-toggle').setAttribute('aria-pressed',String(on));
+  $('select-toggle').textContent=on?'Done':'Select';
+  document.body.classList.toggle('bulk-open',on);
+  $('bulk-bar').hidden=!on;
+  if(on&&!reduceMotion()){const b=$('bulk-bar');b.classList.remove('rise');void b.offsetWidth;b.classList.add('rise');}
+  if(on)requestAnimationFrame(()=>document.body.style.setProperty('--bulk-h',$('bulk-bar').offsetHeight+'px'));
+  render({animate:false});
+  if(on)paintBulk();
+}
+FG.setSelecting=setSelecting;
+$('select-toggle').addEventListener('click',()=>setSelecting(!selecting));
+$('bulk-done').addEventListener('click',()=>{setSelecting(false);$('select-toggle').focus();});
+$('bulk-all').addEventListener('click',()=>{
+  const shown=filtered(),all=shown.length&&shown.every(c=>selected.has(c.name));
+  if(all)selected.clear();else shown.forEach(c=>selected.add(c.name));
+  render({animate:false});
+});
+$('bulk-team').addEventListener('click',()=>{
+  FG.startingTeam(FG.lord()).filter(n=>FG.revealed(n)).forEach(n=>selected.add(n));
+  render({animate:false});FG.toast(`${FG.lord()}’s starting team selected`);
+});
+$('bulk-bar').addEventListener('click',e=>{
+  const b=e.target.closest('[data-bulk]');if(!b||!selected.size)return;
+  const names=[...selected],[list,on]={recruit:['recruited',true],unrecruit:['recruited',false],wish:['wishlist',true],unwish:['wishlist',false]}[b.dataset.bulk];
+  const before=new Set(store.profile()[list]);
+  store.setMembers(list,names,on);
+  const changed=names.filter(n=>before.has(n)!==on);
+  selected.clear();render({animate:false});
+  /* Stamp the cards that changed, one after another. */
+  if(!reduceMotion())[...document.querySelectorAll('.card')].filter(c=>changed.includes(c.dataset.name)).forEach((c,i)=>{c.style.setProperty('--k',i);c.classList.add(on?'bulk-stamp':'bulk-unstamp');setTimeout(()=>c.classList.remove('bulk-stamp','bulk-unstamp'),900+i*45);});
+  FG.haptic?.('success');
+  $('bulk-all').focus({preventScroll:true});
+  const what={recruit:'marked recruited',unrecruit:'unmarked',wish:'added to wishlist',unwish:'removed from wishlist'}[b.dataset.bulk];
+  FG.toast(changed.length?`${changed.length} ${changed.length===1?'character':'characters'} ${what}`:'Already up to date');
+});
+
 /* ---------- Character field note ---------- */
 function lordTable(c){
   const cur=FG.lord();
   return `<div class="by-lord" role="table" aria-label="Requirements for each lord"><div class="bl-row bl-head" role="row"><span role="columnheader">Lord</span><span role="columnheader">Status</span><span role="columnheader">Sup.</span><span role="columnheader">Ren.</span></div>`+
-    LORDS.map(l=>{const rt=c.routes[l],sk=statusKey(rt);return `<div class="bl-row${l===cur?' cur':''}" role="row" data-route="${l}"><span role="cell" class="bl-lord"><img src="${esc(FG.portrait(l))}" alt="">${l}</span><span role="cell" class="status ${STATUS_CLASS[sk]}">${STATUS_SHORT[sk]}</span><span role="cell"><b>${rt?.support??'—'}</b></span><span role="cell"><b>${rt?.renown??'—'}</b></span></div>`;}).join('')+`</div>`;
+    LORDS.map(l=>{const rt=FG.routeOf(c.name,l),sk=statusKey(rt);return `<div class="bl-row${l===cur?' cur':''}" role="row" data-route="${l}"><span role="cell" class="bl-lord"><img src="${esc(FG.portrait(l))}" alt="">${l}</span><span role="cell" class="status ${STATUS_CLASS[sk]}">${STATUS_SHORT[sk]}</span><span role="cell"><b>${rt?.support??'—'}</b></span><span role="cell"><b>${rt?.renown??'—'}</b></span></div>`;}).join('')+`</div>`;
 }
 function bondsSection(name){
   const team=FG.team();
-  const partners=(D.partners.get(name)||[]).slice().sort((a,b)=>(FG.isLord(b)-FG.isLord(a))||(team.includes(b)-team.includes(a))||a.localeCompare(b));
+  const partners=(D.partners.get(name)||[]).slice().sort((a,b)=>(FG.isLord(b)-FG.isLord(a))||(team.includes(b)-team.includes(a))||FG.byGameOrder(a,b));
   if(!partners.length)return '<p class="unknown">No support conversations listed.</p>';
   return `<div class="mini-bonds">${partners.map(n=>{const pr=FG.pair(name,n),s=FG.seen(name,n);return `<button type="button" class="mini-bond" data-pair="${esc(name)}|${esc(n)}"><img src="${esc(FG.portrait(n))}" alt="" loading="lazy"><span>${esc(n)}</span><span class="pips" aria-label="${s.length} of ${pr.ranks.length} viewed">${['C','B','A'].map(r=>`<i class="${!pr.ranks.includes(r)?'gap':s.includes(r)?'on':''}">${r}</i>`).join('')}</span></button>`;}).join('')}</div>`;
 }
@@ -336,16 +444,25 @@ function foodSection(name){
   const body=line('love','Loves')+line('like','Likes')+line('dislike','Dislikes');
   return body?`<dt><svg class="ico" aria-hidden="true"><use href="#i-meal"/></svg>At the table</dt><dd>${body}</dd>`:'';
 }
+/* Steps the guide can check for you: Part gates (journey) and paralogues marked viewed in any save file. */
+function stepMet(t){
+  const j=store.journey(),part=t.match(/^Reach (Part (I{1,3}))\b/);
+  if(part)return j.part>=part[2].length?'reached':'';
+  const para=t.match(/^Clear (.+?)’s paralogue/);
+  if(para){const tag=`-paralogue-${para[1].toLowerCase().replace(/\s+/g,'-')}"`;return store.profiles().some(p=>p.viewed.some(k=>k.includes(tag)))?'cleared':'';}
+  return '';
+}
 function recruitSteps(rt,sk){
+  if(sk==='sealed')return '<span class="unknown">Sealed until later in your journey — nothing here hints at what’s ahead.</span>';
   if(!rt||sk==='no')return '<span class="unknown">Not recruitable on this route.</span>';
   const steps=rt.steps||[];
   if((sk==='auto'||sk==='prologue')&&!steps.length)return 'Joins automatically.';
   /* Levels only matter when the guide lists them (later recruits usually join without them). */
   const base=rt.support!=null||rt.renown!=null?`<li class="step-base">Reach support level <b>${rt.support??'—'}</b> with ${esc(FG.lord())} and renown <b>${rt.renown??'—'}</b></li>`:'';
-  return `<ol class="steps">${base}${steps.map(t=>`<li>${esc(t)}</li>`).join('')}</ol>`+(steps.length||!base?'':'<p class="note">No extra steps listed — the levels above are enough.</p>');
+  return `<ol class="steps">${base}${steps.map(t=>{const met=stepMet(t);return `<li${met?' class="met"':''}>${esc(t)}${met?`<span class="met-tag"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>${esc(met)}</span>`:''}</li>`;}).join('')}</ol>`+(steps.length||!base?'':'<p class="note">No extra steps listed — the levels above are enough.</p>');
 }
 function showDetail(name,open=true){
-  const c=D.byName.get(name);if(!c)return;
+  const c=D.byName.get(name);if(!c||!FG.revealed(name))return;
   activeName=name;const focused=document.activeElement?.id;
   const p=store.profile(),rt=FG.routeOf(name),sk=statusKey(rt),wished=p.wishlist.includes(name),recruited=p.recruited.includes(name);
   $('detail-content').innerHTML=
@@ -387,9 +504,9 @@ FG.pickCharacter=(opts,cb)=>{
 };
 function renderPicker(){
   const q=$('picker-search').value.trim().toLowerCase();
-  const names=(pickerOpts.names||FG.everyone()).filter(n=>!q||n.toLowerCase().includes(q)).filter(n=>!(pickerOpts.exclude||[]).includes(n));
+  const names=(pickerOpts.names||FG.everyone()).filter(n=>FG.isLord(n)||FG.revealed(n)).filter(n=>!q||n.toLowerCase().includes(q)).filter(n=>!(pickerOpts.exclude||[]).includes(n));
   const group=n=>FG.isLord(n)?0:FG.inCompany(n)?1:2;
-  names.sort((a,b)=>group(a)-group(b)||a.localeCompare(b));
+  names.sort((a,b)=>group(a)-group(b)||FG.byGameOrder(a,b));
   const label=['Lords','In your company','Everyone else'];
   let html='',last=-1;
   names.forEach(n=>{
@@ -445,7 +562,8 @@ function filesClick(e){
   }else if(nw){
     const lord=nw.dataset.new,taken=new Set(store.profiles().map(p=>p.name));
     let name=`${lord}’s journey`,i=2;while(taken.has(name))name=`${lord}’s journey ${i++}`;
-    store.create(lord,name);FG.toast(`New file: ${name}`);if($('files').open)FG.closeSheet($('files'));
+    const team=FG.startingTeam(lord);
+    store.create(lord,name,team);FG.toast(team.length?`New file: ${name} · starting team recruited`:`New file: ${name}`);if($('files').open)FG.closeSheet($('files'));
   }
 }
 $('files-list').addEventListener('click',filesClick);
@@ -483,6 +601,7 @@ $('backup-apply').addEventListener('click',()=>{
 let lastLord=null;
 function refreshAll(){
   const lord=FG.lord();
+  FG.rebuildPartners();
   if(lord!==lastLord){
     for(const k of [...filterState.keys()])if(k.startsWith('partner:'))filterState.delete(k);
     lastLord=lord;renderFilterGroups();
@@ -491,7 +610,9 @@ function refreshAll(){
   if(tab!=='missables')FG.setTheme(lord);
   if(tab==='all')render({animate:false});
   if(tab==='about'||$('files').open)renderFiles();
-  if($('detail').open&&activeName)showDetail(activeName,false);
+  if(activeName&&!FG.revealed(activeName)){FG.closeSheet($('detail'));$('detail-content').innerHTML='';activeName=null;}
+  else if($('detail').open&&activeName)showDetail(activeName,false);
+  if($('picker').open)renderPicker();
   FG.onProfileChange.forEach(fn=>fn());
 }
 store.on('change',refreshAll);

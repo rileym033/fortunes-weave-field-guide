@@ -13,10 +13,11 @@
 <title>Field Guide · Fortune’s Weave</title>
 <link rel="preload" href="fonts/cinzel-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/cormorant-garamond-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=33">
-<link rel="stylesheet" href="missables.css?v=33">
-<link rel="stylesheet" href="v2.css?v=33">
-<link rel="stylesheet" href="fx.css?v=33">
+<link rel="stylesheet" href="style.css?v=37">
+<link rel="stylesheet" href="missables.css?v=37">
+<link rel="stylesheet" href="v2.css?v=37">
+<link rel="stylesheet" href="fx.css?v=37">
+<link rel="stylesheet" href="v3.css?v=37">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -24,6 +25,8 @@
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
   <symbol id="i-company" viewBox="0 0 24 24"><path d="M12 2.8 19 5.6v5.6c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V5.6z"/><path d="m12 7.4 1.3 2.7 3 .4-2.2 2.1.5 3L12 14.2l-2.6 1.4.5-3-2.2-2.1 3-.4z"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.2"/><path d="M8.2 10.5V7.8a3.8 3.8 0 0 1 7.6 0v2.7"/><path d="M12 14.6v2.2"/></symbol>
+  <symbol id="i-select" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><path d="m14 17 2 2 4-4.4"/></symbol>
   <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3.2 2.7 5.5 6 .9-4.35 4.2 1 6-5.35-2.85-5.35 2.85 1-6L3.3 9.6l6-.9z"/></symbol>
   <symbol id="i-seal" viewBox="0 0 24 24"><path d="M12 2.6l2.1 1.6 2.6-.2.9 2.5 2.3 1.2-.4 2.6 1.4 2.2-1.4 2.2.4 2.6-2.3 1.2-.9 2.5-2.6-.2L12 21.4l-2.1-1.6-2.6.2-.9-2.5-2.3-1.2.4-2.6L3.1 12l1.4-2.2-.4-2.6 2.3-1.2.9-2.5 2.6.2z"/><path d="m8.4 12.2 2.4 2.4 4.8-5"/></symbol>
   <symbol id="i-hourglass" viewBox="0 0 24 24"><path d="M6.5 3h11M6.5 21h11"/><path d="M8 3c0 4.6 8 5 8 9s-8 4.4-8 9M16 3c0 4.6-8 5-8 9s8 4.4 8 9"/><path d="M10 18.6c.8-.7 3.2-.7 4 0"/></symbol>
@@ -95,14 +98,14 @@
       <p class="filter-help"><span class="tri-demo inc"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg></span>Tap once: show only <span class="tri-demo exc"><svg class="ico" aria-hidden="true"><use href="#i-ban"/></svg></span>Twice: hide · Third tap clears. In search, <b>−word</b> hides matches.</p>
       <div id="filter-groups"></div>
       <div class="filtergrid sortgrid">
-        <label>Sort by<select id="sort"><option value="name">Name</option><option value="support">Support level</option><option value="renown">Renown</option><option value="gold">Gold required</option><option value="status">Recruitment status</option><option value="supports">Support partner count</option></select></label>
+        <label>Sort by<select id="sort"><option value="game">Game order</option><option value="name">Name</option><option value="support">Support level</option><option value="renown">Renown</option><option value="gold">Gold required</option><option value="status">Recruitment status</option><option value="supports">Support partner count</option></select></label>
         <button id="direction" class="ghostbtn">↑ Ascending</button>
       </div>
       <button id="reset" class="textbutton">Reset search &amp; filters</button>
     </div>
   </div>
 
-  <div class="listmeta"><h2 id="view-title">The company</h2><span id="count" role="status" aria-live="polite">Opening field notes…</span></div>
+  <div class="listmeta"><h2 id="view-title">The company</h2><span id="count" role="status" aria-live="polite">Opening field notes…</span><button type="button" id="select-toggle" class="select-toggle" aria-pressed="false">Select</button></div>
   <p class="legend"><span><b class="rank-gem r-A" aria-hidden="true">A</b> highest listed support scene</span><span id="legend-lord">Support lv. = with Theodora</span></p>
   <div id="cards"></div>
   <section id="empty" class="empty" hidden>
@@ -145,8 +148,9 @@
       <button type="button" data-filter="done" aria-pressed="false">Viewed</button>
     </div>
     <label class="switch"><input type="checkbox" id="sp-company-only"><span class="sw" aria-hidden="true"></span>In my company</label>
-    <label class="switch"><input type="checkbox" id="sp-part1"><span class="sw" aria-hidden="true"></span>Part I only</label>
+    <label class="switch"><input type="checkbox" id="sp-part1"><span class="sw" aria-hidden="true"></span>Open now</label>
   </div>
+  <div class="pill-row"><button type="button" class="ghostbtn small levels-btn" id="sp-levels" aria-haspopup="dialog"><svg class="ico" aria-hidden="true"><use href="#i-sliders"/></svg>Set levels</button><span style="flex:1"></span><button type="button" class="jr-pill" data-journey-pill><i aria-hidden="true"></i><span class="jp-text">Part I</span><svg class="ico" aria-hidden="true"><use href="#i-chev-r"/></svg></button></div>
   <div id="sp-list" class="bond-list"></div>
   <p id="sp-empty" class="empty" hidden></p>
   <details class="spoiler-links rules-box"><summary>How supports work</summary><ul id="sp-rules" class="rules"></ul></details>
@@ -183,7 +187,9 @@
 </section>
 
 <!-- ============ MISSABLES ============ -->
-<section id="missables-view" class="view" hidden aria-labelledby="missables-heading">
+<section id="missables-view" class="view missables-view" hidden aria-labelledby="missables-heading">
+  <div class="part-bar"><div class="part-tabs" id="part-tabs" role="tablist" aria-label="Choose a Part"></div></div>
+  <div class="part-stage" id="part-stage" hidden></div>
   <div class="lord-stage" id="lord-stage">
     <div class="lord-track" id="route-carousel" tabindex="0" role="region" aria-roledescription="carousel" aria-label="Lord routes. Swipe or use the arrow keys to change route."></div>
     <button class="stage-arrow prev" id="route-prev" type="button" aria-label="Previous route"><svg class="ico" aria-hidden="true"><use href="#i-chev-l"/></svg></button>
@@ -194,7 +200,7 @@
   <div class="route-tabs-wrap"><div class="route-tabs" id="route-tabs" role="tablist" aria-label="Choose a lord’s route"></div></div>
   <p id="route-status" class="sr-only" aria-live="polite"></p>
   <div class="missables-head">
-    <p class="eyebrow">Part I · Scenes &amp; Paralogues</p>
+    <div class="mh-top"><p class="eyebrow" id="missables-eyebrow">Part I · Scenes &amp; Paralogues</p><button type="button" class="jr-pill" data-journey-pill><i aria-hidden="true"></i><span class="jp-text">Part I</span><svg class="ico" aria-hidden="true"><use href="#i-chev-r"/></svg></button></div>
     <div class="mh-row">
       <h1 id="missables-heading" tabindex="-1">Missables</h1>
       <div id="missables-filter" class="segmented" role="group" aria-label="Show">
@@ -211,9 +217,10 @@
   <p class="note hint"><svg class="ico" aria-hidden="true"><use href="#i-spark"/></svg>Tap a title for requirements, not story summaries.</p>
   <p id="missables-storage-warning" class="warning" role="status" hidden>Checklist storage is unavailable or unreadable. Marks work for this visit but may not be saved.</p>
   <p id="missables-load-error" class="warning" role="status" hidden>Missables notes are not available. Verified data may not be published yet, or the connection failed. No checklist has been inferred. Reload to try again.</p>
+  <div id="sealed-card" class="sealed-card" role="tabpanel" hidden><span class="seal-gem" aria-hidden="true"><svg class="ico"><use href="#i-lock"/></svg></span><h2 id="sealed-title">Sealed</h2><p id="sealed-text"></p><button type="button" class="goldbtn" data-journey-pill>Update my journey</button></div>
   <div id="missables-list" role="tabpanel" aria-labelledby="missables-heading"></div>
   <p id="missables-empty" class="empty" hidden></p>
-  <p class="note">Check off viewed notes · Saved automatically in this save file, separately for each route.</p>
+  <p class="note" id="missables-footnote">Check off viewed notes · Saved automatically in this save file, separately for each route.</p>
   <div id="missables-coverage" class="note coverage"></div>
 </section>
 
@@ -226,6 +233,7 @@
     <span class="weave-slot center" data-weave aria-hidden="true"></span>
   </header>
   <div class="codex">
+    <section class="journey" id="journey" aria-labelledby="journey-title"></section>
     <div class="backup-card" id="files-card">
       <h2><svg class="ico" aria-hidden="true"><use href="#i-scroll"/></svg>Your save files</h2>
       <p>Everything you tap saves itself straight away — recruits, wishlist, supports, meals and missables. Each save file is one playthrough with its own lord.</p>
@@ -255,9 +263,10 @@
 
     <div id="source-notes">
       <h2>Reading the field notes</h2>
-      <p><strong>Every lord, one roster:</strong> the Company page shows requirements for your save file’s lord. Each character’s field note also compares all four lords. Major story recruits and story unlock details are excluded.</p>
-      <p><strong>Two different support measures:</strong> “Support lv.” is the numeric level a character needs with your lord to be recruited. Support conversations (C, B, A) are scenes between two characters; the guide lists the highest rank the community matrix records, not a promise that every lower rank exists.</p>
-      <p><strong>Requirements are deliberately vague.</strong> Unlock hints say what kind of thing is needed — a support level, both characters in your company, or “a later story point” — never what happens.</p>
+      <p><strong>Every lord, one roster:</strong> the Company page shows requirements for your save file’s lord. Each character’s field note also compares all four lords.</p>
+      <p><strong>Your journey keeps things sealed:</strong> later characters, later support conversations and later missable notes stay hidden until you set your journey (above) to the point where you reach them. Moving it back hides them again.</p>
+      <p><strong>Two different support measures:</strong> “Support lv.” on a card is the level a character needs with your lord to be recruited. Support conversations (C, B, A) are scenes between two characters; most open at levels 2, 3 and 4.</p>
+      <p><strong>Requirements, not story:</strong> unlock notes say what to do — a Part, a chapter, a path, a quest, both characters in your company — never what happens.</p>
       <p><strong>Uncertainty:</strong> support data comes from a community matrix and tracker that share sources, so it isn’t independent in-game verification. Recruitment thresholds were compared between two guides; disagreements are marked in each field note. Meal preferences are community-reported.</p>
       <details class="spoiler-links">
         <summary>Source links — <em>these pages contain spoilers</em></summary>
@@ -286,6 +295,10 @@
   <button data-tab="about"><svg class="ico" aria-hidden="true"><use href="#i-book"/></svg><span>More</span></button>
 </nav>
 
+<div id="bulk-bar" class="bulk-bar" role="region" aria-label="Update selected characters" hidden>
+  <div class="bulk-top"><span id="bulk-count" role="status" aria-live="polite">Tap cards to select</span><button type="button" class="textbutton" id="bulk-team">Starting team</button><button type="button" class="textbutton" id="bulk-all">All shown</button><button type="button" class="goldbtn small" id="bulk-done">Done</button></div>
+  <div class="bulk-actions"><button type="button" class="goldbtn" data-bulk="recruit"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Recruited</button><button type="button" class="ghostbtn" data-bulk="unrecruit"><svg class="ico" aria-hidden="true"><use href="#i-close"/></svg>Unmark</button><button type="button" class="ghostbtn" data-bulk="wish"><svg class="ico" aria-hidden="true"><use href="#i-star"/></svg>Wishlist</button></div>
+</div>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
 <dialog id="missables-detail" class="sheet" aria-labelledby="missables-detail-title">
@@ -302,6 +315,11 @@
   <div class="sheet-grip" aria-hidden="true"><i></i></div>
   <div class="dialogtop"><span class="eyebrow">Support conversation</span><button id="close-pair" class="closebtn" aria-label="Close support details"><svg class="ico" aria-hidden="true"><use href="#i-close"/></svg></button></div>
   <div id="pair-content"></div>
+</dialog>
+<dialog id="levels" class="sheet tall" aria-labelledby="levels-title">
+  <div class="sheet-grip" aria-hidden="true"><i></i></div>
+  <div class="dialogtop"><span class="eyebrow">Support levels</span><button id="close-levels" class="closebtn" aria-label="Close support levels"><svg class="ico" aria-hidden="true"><use href="#i-close"/></svg></button></div>
+  <div id="levels-content"></div>
 </dialog>
 <dialog id="picker" class="sheet tall" aria-labelledby="picker-title">
   <div class="sheet-grip" aria-hidden="true"><i></i></div>
@@ -320,11 +338,12 @@
     <div class="lord-pick" id="new-file-lords"></div>
   </div>
 </dialog>
-<script src="store.js?v=33"></script>
-<script src="fx.js?v=33" defer></script>
-<script src="app.js?v=33" defer></script>
-<script src="supports.js?v=33" defer></script>
-<script src="meals.js?v=33" defer></script>
-<script src="missables.js?v=33" defer></script>
+<script src="store.js?v=37"></script>
+<script src="fx.js?v=37" defer></script>
+<script src="app.js?v=37" defer></script>
+<script src="journey.js?v=37" defer></script>
+<script src="supports.js?v=37" defer></script>
+<script src="meals.js?v=37" defer></script>
+<script src="missables.js?v=37" defer></script>
 </body>
 </html>

@@ -4,13 +4,19 @@
 const store=FG.store,D=FG.data;
 let focus=null,mode='next',companyOnly=false,part1Only=false,pairA=null,pairB=null,pairReturn=null,castBuilt=false;
 const lvlFor=r=>FG.RANK_LEVEL[r];
-const levelOf=(a,b)=>store.supports()[FG.pairKey(a,b)]?.level??null;
+/* Every pair starts at support level 1, as in the game; the guide stores only levels above that. */
+const levelOf=(a,b)=>store.supports()[FG.pairKey(a,b)]?.level??1;
+const MAX_LEVEL=()=>FG.data.supports?.viewing?.maxLevel||5;
 const calm=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
 /* Per-rank requirement text, falling back to the pair-wide hint for the next rank. */
 const reqFor=(pr,r)=>pr.reqs?.[r]||null;
 const confOf=(pr,r)=>pr.conf?.[r]||'confirmed';
 const partOf=(pr,r)=>pr.parts?.[r]||null;
-const LATER=r=>r&&r>1;
+/* Ready = high enough level AND the journey has reached the point where the scene can be viewed. */
+const gateOf=(a,b,r)=>FG.rankGate(FG.pair(a,b),r);
+const needFor=(a,b,r)=>FG.rankLevel(FG.pair(a,b),r);
+const isReady=(a,b)=>{const nx=FG.nextRank(a,b);return !!nx&&levelOf(a,b)>=needFor(a,b,nx)&&!gateOf(a,b,nx);};
+FG.supportReady=isReady;
 
 function setSeen(a,b,rank,on){
   const pr=FG.pair(a,b);if(!pr)return[];
@@ -28,7 +34,7 @@ function setSeen(a,b,rank,on){
 function setLevel(a,b,level){
   store.updateSupports(sup=>{
     const key=FG.pairKey(a,b),cur=sup[key]||{seen:[],level:null};
-    cur.level=level;
+    cur.level=level>1?level:null;
     if(cur.seen.length||cur.level!==null)sup[key]=cur;else delete sup[key];
   });
 }
@@ -39,9 +45,10 @@ function burstRanks(root,ranks){ranks.forEach((r,i)=>FG.burst(root?.querySelecto
 function statusLine(a,b){
   const next=FG.nextRank(a,b),lv=levelOf(a,b);
   if(!next)return {cls:'done',text:'All conversations viewed'};
-  const need=lvlFor(next);
-  if(lv!==null&&lv>=need)return {cls:'ready',text:`${next} ready to view · lv. ${lv}`};
-  return {cls:'next',text:`Next: ${next} at lv. ${need}${lv!==null?` · now ${lv}`:''}`};
+  const need=needFor(a,b,next),gate=gateOf(a,b,next);
+  if(lv>=need&&!gate)return {cls:'ready',text:`${next} ready to view · lv. ${lv}`};
+  if(gate)return {cls:'locked',text:`${next} at lv. ${need} · ${gate.short}`};
+  return {cls:'next',text:`Next: ${next} at lv. ${need}${lv>1?` · now ${lv}`:''}`};
 }
 function pipsHTML(a,b){
   const pr=FG.pair(a,b),s=FG.seen(a,b);
@@ -53,19 +60,19 @@ function rows(){
   const team=FG.team();
   let list=(D.partners.get(focus)||[]).map(n=>({n,pr:FG.pair(focus,n),next:FG.nextRank(focus,n)}));
   if(companyOnly)list=list.filter(x=>FG.inCompany(x.n));
-  if(part1Only)list=list.filter(x=>!x.next||!LATER(partOf(x.pr,x.next)));
+  if(part1Only)list=list.filter(x=>!x.next||!gateOf(focus,x.n,x.next));
   if(mode==='next')list=list.filter(x=>x.next);
   if(mode==='done')list=list.filter(x=>!x.next);
   const rankOrder=r=>r?['C','B','A'].indexOf(r):9;
   list.sort((x,y)=>{
     if(mode==='next'){
-      const rx=levelOf(focus,x.n)>=lvlFor(x.next)?0:1,ry=levelOf(focus,y.n)>=lvlFor(y.next)?0:1;
+      const rx=isReady(focus,x.n)?0:gateOf(focus,x.n,x.next)?2:1,ry=isReady(focus,y.n)?0:gateOf(focus,y.n,y.next)?2:1;
       if(rx!==ry)return rx-ry;
       const cx=FG.inCompany(x.n)?0:1,cy=FG.inCompany(y.n)?0:1;
       if(cx!==cy)return cx-cy;
       if(rankOrder(x.next)!==rankOrder(y.next))return rankOrder(x.next)-rankOrder(y.next);
     }
-    return (FG.isLord(y.n)-FG.isLord(x.n))||(team.includes(y.n)-team.includes(x.n))||x.n.localeCompare(y.n);
+    return (FG.isLord(y.n)-FG.isLord(x.n))||(team.includes(y.n)-team.includes(x.n))||FG.byGameOrder(x.n,y.n);
   });
   return list;
 }
@@ -74,9 +81,9 @@ function rows(){
 function castOrder(){
   const names=FG.everyone().filter(n=>(D.partners.get(n)||[]).length);
   const g=n=>FG.isLord(n)?0:FG.inCompany(n)?1:2;
-  return names.sort((a,b)=>g(a)-g(b)||(g(a)===0?FG.store.LORDS.indexOf(a)-FG.store.LORDS.indexOf(b):a.localeCompare(b)));
+  return names.sort((a,b)=>g(a)-g(b)||FG.byGameOrder(a,b));
 }
-function anyReady(n){return (D.partners.get(n)||[]).some(m=>{const nx=FG.nextRank(n,m),lv=levelOf(n,m);return nx&&lv!==null&&lv>=lvlFor(nx);});}
+function anyReady(n){return (D.partners.get(n)||[]).some(m=>isReady(n,m));}
 function buildCast(){
   const order=castOrder(),g=n=>FG.isLord(n)?0:FG.inCompany(n)?1:2;
   let html='',last=null;
@@ -165,8 +172,64 @@ $('sp-focus').addEventListener('click',()=>{
     name=>{setFocus(name);window.scrollTo({top:0,behavior:'auto'});});
 });
 
+/* ---------- Set levels: every partner of the focused character on one sheet ---------- */
+function gaugeHTML(lv,label,command=false){
+  const max=MAX_LEVEL();let h=`<div class="lv-gauge" role="${command?'group':'radiogroup'}" aria-label="${esc(label)}">`;
+  for(let n=1;n<=max;n++){const mark=Object.entries(FG.RANK_LEVEL).find(([,v])=>v===n)?.[0],tag=mark?` (${mark})`:'';
+    h+=command?`<button type="button" data-set="${n}" aria-label="Set every level below to ${n}${tag}" style="--n:${n}"><b>${n}</b>${mark?`<small>${mark}</small>`:''}</button>`
+      :`<button type="button" role="radio" data-set="${n}" aria-checked="${n===lv}" tabindex="${n===lv?0:-1}" aria-label="Level ${n}${tag}" class="${n<=lv?'on':''}${n===lv?' top':''}" style="--n:${n}"><b>${n}</b>${mark?`<small>${mark}</small>`:''}</button>`;}
+  return h+'</div>';
+}
+function levelRow(n){
+  const st=statusLine(focus,n);
+  return `<div class="lv-row" data-partner="${esc(n)}"><span class="pf sm"><img src="${esc(FG.portrait(n))}" alt="" loading="lazy"></span>`+
+    `<span><b class="lv-name">${esc(n)}</b><small class="st ${st.cls}">${esc(st.text)}</small></span>${gaugeHTML(levelOf(focus,n),`Support level with ${n}`)}</div>`;
+}
+function renderLevels(){
+  const partners=(D.partners.get(focus)||[]).slice().filter(n=>!companyOnly||FG.inCompany(n));
+  $('levels-content').innerHTML=
+    `<div class="levels-head"><span class="pf sm"><img src="${esc(FG.portrait(focus))}" alt=""></span><h2 id="levels-title">${esc(focus)}’s levels</h2></div>`+
+    `<p class="note">Copy the numbers from the game’s support screen. C, B and A usually open at levels 2, 3 and 4.</p>`+
+    `<div class="levels-all"><span>Set everyone below to</span>${gaugeHTML(0,'Set every level below',true)}</div>`+
+    (partners.length?partners.map(levelRow).join(''):`<p class="unknown">No partners to show${companyOnly?' in your company':''}.</p>`);
+}
+function writeLevels(pairs){
+  store.updateSupports(sup=>{
+    pairs.forEach(([a,b,level])=>{const key=FG.pairKey(a,b),cur=sup[key]||{seen:[],level:null};cur.level=level>1?level:null;if(cur.seen.length||cur.level!==null)sup[key]=cur;else delete sup[key];});
+  });
+}
+$('levels-content').addEventListener('click',e=>{
+  const b=e.target.closest('[data-set]');if(!b)return;
+  const n=+b.dataset.set,row=b.closest('.lv-row');
+  if(row){
+    const partner=row.dataset.partner,wasReady=isReady(focus,partner);
+    writeLevels([[focus,partner,n]]);
+    row.outerHTML=levelRow(partner);
+    const fresh=$('levels-content').querySelector(`.lv-row[data-partner="${CSS.escape(partner)}"]`);
+    fresh?.querySelector(`[data-set="${n}"]`)?.focus();
+    if(!wasReady&&isReady(focus,partner)&&fresh&&!calm()){fresh.classList.add('flash');FG.burst(fresh.querySelector('.lv-gauge .top'));}
+    FG.haptic?.();
+  }else{
+    const partners=[...$('levels-content').querySelectorAll('.lv-row')].map(r=>r.dataset.partner);
+    writeLevels(partners.map(p=>[focus,p,n]));renderLevels();
+    if(!calm())$('levels-content').querySelectorAll('.lv-row').forEach((r,i)=>{r.style.animationDelay=`${i*25}ms`;r.classList.add('flash');});
+    FG.haptic?.('success');FG.toast(`${partners.length} levels set to ${n}`);
+    $('levels-content').querySelector('.levels-all [data-set]')?.focus();
+  }
+});
+$('levels-content').addEventListener('keydown',e=>{
+  const b=e.target.closest('[data-set]');if(!b)return;
+  const row=b.closest('.lv-row'),n=+b.dataset.set,max=MAX_LEVEL();
+  const to={ArrowRight:n+1,ArrowUp:n+1,ArrowLeft:n-1,ArrowDown:n-1,Home:1,End:max}[e.key];
+  if(to===undefined)return;e.preventDefault();
+  const t=Math.max(1,Math.min(max,to)),target=b.parentElement.querySelector(`[data-set="${t}"]`);
+  if(row)target?.click();else target?.focus();      /* radios select as they move; the bulk row only moves focus */
+});
+$('sp-levels').addEventListener('click',()=>{renderLevels();FG.openSheet($('levels'));});
+FG.wireSheet($('levels'),$('close-levels'),()=>{if(FG.currentTab()==='supports')render();$('sp-levels').focus({preventScroll:true});});
+
 /* ---------- Pair sheet ---------- */
-function openPair(a,b,returnTo){pairA=a;pairB=b;const el=document.activeElement;pairReturn=returnTo||(()=>el);renderPair();FG.openSheet($('pair'));}
+function openPair(a,b,returnTo){if(!FG.revealed(a)||!FG.revealed(b))return;pairA=a;pairB=b;const el=document.activeElement;pairReturn=returnTo||(()=>el);renderPair();FG.openSheet($('pair'));}
 FG.openPair=(a,b,returnTo)=>{const wasOpen=$('detail').open;if(wasOpen)FG.closeSheet($('detail'));setTimeout(()=>openPair(a,b,returnTo||(()=>document.querySelector('.bottomnav [aria-current]'))),wasOpen?280:0);};
 function renderPair(){
   const a=pairA,b=pairB,pr=FG.pair(a,b);if(!pr)return;
@@ -182,11 +245,12 @@ function renderPair(){
     `<ol class="rank-steps">${pr.ranks.map(r=>{
       const inf=confOf(pr,r)==='unconfirmed',req=reqFor(pr,r);
       return `<li class="${s.includes(r)?'on':''}${r===next?' next':''}${inf?' unconfirmed':''}"><button type="button" class="pip big r-${r}${inf?' unconfirmed':''}" data-rank="${r}" aria-pressed="${s.includes(r)}" aria-label="${r} conversation${s.includes(r)?', viewed':''}${inf?', unconfirmed':''}"><span><em>${r}</em></span></button>`+
-        `<div><b>${r} conversation${inf?'<span class="conf">unconfirmed</span>':''}</b><small>${s.includes(r)?'Viewed':`Support level ${lvlFor(r)}`}${partOf(pr,r)?` · Part ${['','I','II','III'][partOf(pr,r)]}`:''}</small>${req?`<span class="req"><svg class="ico" aria-hidden="true"><use href="#i-key"/></svg>${esc(req)}</span>`:''}</div></li>`;}).join('')}</ol>`+
+        `<div><b>${r} conversation${inf?'<span class="conf">unconfirmed</span>':''}</b><small>${s.includes(r)?'Viewed':`Support level ${FG.rankLevel(pr,r)}`}${partOf(pr,r)?` · Part ${['','I','II','III'][partOf(pr,r)]}`:''}</small>${req?`<span class="req"><svg class="ico" aria-hidden="true"><use href="#i-key"/></svg>${esc(req)}</span>`:''}`+
+        (s.includes(r)?'':(g=>g?`<span class="gate"><svg class="ico" aria-hidden="true"><use href="#i-lock"/></svg>${esc(g.text)} — you’re in ${esc(FG.partName(FG.journey().part))}</span>`:`<span class="gate open"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Open at your point in the game</span>`)(FG.rankGate(pr,r)))+`</div></li>`;}).join('')}</ol>`+
     (pr.hint&&!pr.reqs?`<div class="hint-box"><span class="eyebrow"><svg class="ico" aria-hidden="true"><use href="#i-key"/></svg>${kind}</span><p>${esc(pr.hint)}</p></div>`:'')+
     (anyInferred?`<p class="note">Dashed ranks appear in only one source that contradicts itself — they may not exist.</p>`:'')+
-    `<div class="level-box"><div><b>Your support level</b><small>Optional — copy it from the game to see what’s ready.</small></div>`+
-    `<div class="stepper" role="group" aria-label="Support level"><button type="button" class="mini" data-lv="-1" aria-label="Lower level"><svg class="ico" aria-hidden="true"><use href="#i-minus"/></svg></button><output id="pair-level" aria-live="polite">${lv===null?'—':lv}</output><button type="button" class="mini" data-lv="1" aria-label="Raise level"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg></button></div></div>`+
+    `<div class="level-box"><div><b>Your support level</b><small>Every pair starts at 1. Copy it from the game to see what’s ready.</small></div>`+
+    `<div class="stepper" role="group" aria-label="Support level"><button type="button" class="mini" data-lv="-1" aria-label="Lower level"${lv<=1?' disabled':''}><svg class="ico" aria-hidden="true"><use href="#i-minus"/></svg></button><output id="pair-level" aria-live="polite">${lv}</output><button type="button" class="mini" data-lv="1" aria-label="Raise level"${lv>=MAX_LEVEL()?' disabled':''}><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg></button></div></div>`+
     (!FG.inCompany(a)||!FG.inCompany(b)?`<p class="note">${esc([a,b].filter(n=>!FG.inCompany(n)).join(' and '))} ${[a,b].filter(n=>!FG.inCompany(n)).length>1?'aren’t':'isn’t'} marked as in your company in this save file.</p>`:'')+
     `<div class="md-actions"><button type="button" class="goldbtn" id="pair-meal"><svg class="ico" aria-hidden="true"><use href="#i-meal"/></svg>Plan a meal for them</button></div>`;
 }
@@ -198,10 +262,9 @@ $('pair-content').addEventListener('click',e=>{
     $('pair-content').querySelector(`.pip[data-rank="${r}"]`)?.focus();
     burstRanks($('pair-content'),fresh);
   }else if(lvb){
-    const cur=levelOf(pairA,pairB),d=+lvb.dataset.lv;
-    let next=cur===null?(d>0?1:null):cur+d;
-    if(next!==null&&next<1)next=null;if(next!==null&&next>5)next=5;
-    setLevel(pairA,pairB,next);renderPair();$('pair-content').querySelector(`[data-lv="${d}"]`)?.focus();
+    const d=+lvb.dataset.lv,next=Math.max(1,Math.min(MAX_LEVEL(),levelOf(pairA,pairB)+d));
+    setLevel(pairA,pairB,next);renderPair();
+    const again=$('pair-content').querySelector(`[data-lv="${d}"]`);(again&&!again.disabled?again:$('pair-content').querySelector('[data-lv]:not([disabled])'))?.focus();
   }else if(e.target.closest('#pair-meal')){
     const a=pairA,b=pairB;pairReturn=()=>$('meals-heading');FG.closeSheet($('pair'));FG.planMeal?.([a,b]);
   }
@@ -219,7 +282,9 @@ FG.onProfileChange.push(()=>{
   const l=FG.lord();if(l!==lastLord){if(lastLord!==null)focus=l;lastLord=l;}
   castBuilt=false;
   if(FG.currentTab()==='supports'){render();paintCast(true);}
-  if($('pair').open)renderPair();
+  if(pairA&&(!FG.revealed(pairA)||!FG.revealed(pairB))){FG.closeSheet($('pair'));$('pair-content').innerHTML='';pairA=pairB=null;}
+  else if($('pair').open)renderPair();
+  if($('levels').open){if(FG.revealed(focus))renderLevels();else FG.closeSheet($('levels'));}
 });
 FG.ready.then(()=>{lastLord=FG.lord();});
 })();

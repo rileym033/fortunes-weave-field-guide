@@ -7,8 +7,11 @@ const PREF_SCORE={love:2,like:1,neutral:0,dislike:-2};
 const PREF_ICON={love:'♥',like:'✓',neutral:'–',dislike:'✕'};
 let prefsWishlist=false,hideNo=false,prevSeats=null,prevPairs=new Set(),wasFull=false;
 
-const seats=()=>store.profile().meal.seats.slice();
-function setSeats(next){store.update(p=>{p.meal.seats=next.slice(0,3);});}
+/* A seated guest the journey hasn't revealed yet shows as an empty seat; the saved name is kept for later. */
+const rawSeats=()=>store.profile().meal.seats.slice();
+const shown=n=>!!n&&(FG.isLord(n)||(FG.data.byName.has(n)&&FG.revealed(n)));
+const seats=()=>rawSeats().map(n=>shown(n)?n:null);
+function setSeats(next){const raw=rawSeats();store.update(p=>{p.meal.seats=next.slice(0,3).map((n,i)=>n===null&&raw[i]&&!shown(raw[i])?raw[i]:n);});}
 FG.planMeal=names=>{
   const lord=FG.lord(),want=[...new Set(names)];
   let next=want.includes(lord)||want.length>=3?want:[lord,...want];
@@ -19,11 +22,12 @@ FG.planMeal=names=>{
 function pairInfo(a,b){
   const pr=FG.pair(a,b);
   if(!pr)return{has:false,text:'No support conversations listed'};
-  const next=FG.nextRank(a,b),lv=store.supports()[FG.pairKey(a,b)]?.level??null;
+  const next=FG.nextRank(a,b),lv=store.supports()[FG.pairKey(a,b)]?.level??1;
   if(!next)return{has:true,done:true,text:'Every listed conversation viewed',max:pr.maxRank};
-  const need=FG.RANK_LEVEL[next];
-  return{has:true,next,need,lv,ready:lv!==null&&lv>=need,remaining:pr.ranks.length-FG.seen(a,b).length,max:pr.maxRank,
-    text:lv!==null&&lv>=need?`${next} ready to view`:`Next: ${next} at support level ${need}`};
+  /* Same rule as Supports: the pair's own level for this rank, and the journey must allow it. */
+  const need=FG.rankLevel(pr,next),gate=FG.rankGate(pr,next),ready=lv>=need&&!gate;
+  return{has:true,next,need,lv,ready,remaining:pr.ranks.length-FG.seen(a,b).length,max:pr.maxRank,
+    text:ready?`${next} ready to view`:gate?`Next: ${next} · ${gate.short}`:`Next: ${next} at support level ${need}`};
 }
 function prefOf(name,dishId){
   const p=D.meals?.preferences?.[name];if(!p)return null;
@@ -158,5 +162,6 @@ $('rec-wishlist').addEventListener('change',e=>{prefsWishlist=e.target.checked;r
 $('rec-company').addEventListener('change',e=>{hideNo=e.target.checked;renderRecs();});
 
 FG.onMealsShown=()=>{FG.ready.then(()=>{render();FG.loadMeals().then(()=>{if(FG.currentTab()==='meals')render();});});};
-FG.onProfileChange.push(()=>{if(FG.currentTab()==='meals')render();});
+/* Redraw even while hidden, so nothing the journey has re-sealed lingers in the page. */
+FG.onProfileChange.push(()=>{if(FG.data.roster)render();});
 })();

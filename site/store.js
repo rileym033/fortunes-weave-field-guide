@@ -6,10 +6,14 @@
    overwriting each other: when another tab's newer state arrives without one of
    our recent operations, that operation is re-applied on top of it.
    Support conversations are shared by every save file (they carry across routes in the game too);
-   a copy is also written into each profile so older versions of the guide never lose them. */
+   a copy is also written into each profile so older versions of the guide never lose them.
+   The journey (which Part you're in, which Part I paths are complete) is one timeline shared by every
+   save file — the files only split for the four Part I paths. */
 (function(){
 const FG=window.FG=window.FG||{};
 const KEY='fwfg-save-v2';
+/* Older builds of the guide don't know the journey and drop it when they save, so it also lives under its own key. */
+const JKEY='fwfg-journey-v3';
 const V1={roster:'theodora-field-guide-v1',missables:'theodora-missables-v1',route:'theodora-missables-route-v1'};
 const LORDS=['Cai','Dietrich','Theodora','Leda'];
 const OP_MEMORY=400,OP_TTL=30*60*1000;
@@ -38,6 +42,14 @@ function mergeSupports(...maps){
   }
   return out;
 }
+/* Where the player is in the game. Defaults to Part I (where Bri was when this shipped). */
+function normJourney(j){
+  j=j&&typeof j==='object'?j:{};
+  const part=Number.isInteger(j.part)&&j.part>=0&&j.part<=3?j.part:1;
+  const paths=strArr(j.paths);
+  return{part,paths:LORDS.filter(l=>paths.includes(l)),warLord:LORDS.includes(j.warLord)?j.warLord:null,
+    viewed:strArr(j.viewed),set:!!j.set};
+}
 function normProfile(p){
   if(!p||typeof p!=='object'||typeof p.id!=='string'||!LORDS.includes(p.lord))return null;
   const supports=normSupports(p.supports);
@@ -56,12 +68,15 @@ function normState(s){
   const supports=mergeSupports(normSupports(s.supports),...Object.values(profiles).map(p=>p.supports));
   for(const p of Object.values(profiles))delete p.supports;
   return{schema:2,savedAt:+s.savedAt||0,activeId:profiles[s.activeId]?s.activeId:ids[0],profiles,supports,
-    migratedV1:!!s.migratedV1,ops:strArr(s.ops).slice(-OP_MEMORY)};
+    journey:normJourney(s.journey),migratedV1:!!s.migratedV1,ops:strArr(s.ops).slice(-OP_MEMORY)};
 }
 const parse=text=>{try{return normState(JSON.parse(text));}catch{return null;}};
-function newProfile(lord,name){
+function journeyBackup(){try{const j=JSON.parse(localStorage.getItem(JKEY)||'null');return j&&j.set?normJourney(j):null;}catch{return null;}}
+/* A state written by an older build has no journey (set:false): keep the one we know. */
+function keepJourney(other,known){if(!other.journey.set&&known&&known.set)other.journey=JSON.parse(JSON.stringify(known));return other;}
+function newProfile(lord,name,recruited=[]){
   const t=Date.now();
-  return normProfile({id:uid(),name:name||`${lord}’s journey`,lord,createdAt:t,updatedAt:t,wishlist:[],recruited:[],viewed:[],supports:{},meal:{seats:[lord,null,null]},route:lord});
+  return normProfile({id:uid(),name:name||`${lord}’s journey`,lord,createdAt:t,updatedAt:t,wishlist:[],recruited:strArr(recruited),viewed:[],supports:{},meal:{seats:[lord,null,null]},route:lord});
 }
 
 /* ---- v1 migration (read-only: v1 keys are left untouched) ---- */
@@ -108,10 +123,11 @@ async function idbWrite(text){
 
 /* ---- boot ---- */
 let state=parse(lsRead());
+if(state)keepJourney(state,journeyBackup());
 if(!state){
   const p=fromV1();
   delete p.supports;
-  state={schema:2,savedAt:0,activeId:p.id,profiles:{[p.id]:p},supports:{},migratedV1:true,ops:[]};
+  state={schema:2,savedAt:0,activeId:p.id,profiles:{[p.id]:p},supports:{},journey:normJourney(null),migratedV1:true,ops:[]};
 }
 let activeId=state.activeId;               // per-tab: another tab switching files doesn't yank this one
 let idbOK=null,persisted=null,lastSaved=state.savedAt||0,dirtyIdb=0,idbPending=false;
@@ -126,13 +142,14 @@ function save(){
   state.savedAt=Math.max(Date.now(),(state.savedAt||0)+1);
   const text=serialize();
   const okLS=lsWrite(text);
+  if(state.journey.set)try{localStorage.setItem(JKEY,JSON.stringify(state.journey));}catch{}
   clearTimeout(dirtyIdb);idbPending=true;
   dirtyIdb=setTimeout(()=>idbWrite(text).then(ok=>{idbOK=ok;idbPending=false;emit('health',health());}),250);
   lastSaved=state.savedAt;
   emit('saved',health());
   if(persisted===null)requestPersist();
 }
-function flush(){clearTimeout(dirtyIdb);const text=serialize();lsWrite(text);idbWrite(text).then(ok=>{idbOK=ok;idbPending=false;});}
+function flush(){clearTimeout(dirtyIdb);const text=serialize();lsWrite(text);if(state.journey.set)try{localStorage.setItem(JKEY,JSON.stringify(state.journey));}catch{}idbWrite(text).then(ok=>{idbOK=ok;idbPending=false;});}
 addEventListener('pagehide',flush);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flush();});
 
@@ -141,6 +158,7 @@ function adopt(other,source){
   const have=new Set(other.ops);
   const cutoff=Date.now()-OP_TTL;
   const missing=myOps.filter(o=>o.at>cutoff&&!have.has(o.id));
+  keepJourney(other,state.journey.set?state.journey:journeyBackup());
   state=other;
   if(!state.profiles[activeId])activeId=state.activeId;
   lastSaved=state.savedAt;
@@ -203,12 +221,19 @@ const store={
   update(fn,{quiet=false}={}){commit(onProfile(store.profile().id,fn),'local',quiet);},
   /* Explicit set operations merge cleanly between tabs. */
   setMember(list,name,on){commit(onProfile(store.profile().id,p=>{const a=p[list].filter(n=>n!==name);p[list]=on?[...a,name]:a;}));},
+  /* Bulk version: one operation, so it merges between tabs like a single tap. */
+  setMembers(list,names,on){const set=new Set(names);commit(onProfile(store.profile().id,p=>{const a=p[list].filter(n=>!set.has(n));p[list]=on?[...a,...names]:a;}));},
   toggle(list,name){const added=!store.profile()[list].includes(name);store.setMember(list,name,added);return added;},
   /* Shared support progress (all save files). */
   supports(){return state.supports;},
   updateSupports(fn,{quiet=false}={}){commit(st=>{fn(st.supports);},'local',quiet);},
-  create(lord,name){
-    const p=newProfile(lord,name);delete p.supports;
+  /* Shared journey (all save files). */
+  journey(){return state.journey;},
+  updateJourney(fn,{quiet=false}={}){commit(st=>{fn(st.journey);st.journey.set=true;},'journey',quiet);},
+  /* Prologue / Part II / Part III notes are one timeline, so their marks are shared too. */
+  setSharedViewed(key,on){commit(st=>{const s=new Set(st.journey.viewed);if(on)s.add(key);else s.delete(key);st.journey.viewed=[...s];},'local',true);},
+  create(lord,name,recruited=[]){
+    const p=newProfile(lord,name,recruited);delete p.supports;
     commit(st=>{if(!st.profiles[p.id])st.profiles[p.id]=JSON.parse(JSON.stringify(p));},'switch',true);
     activeId=p.id;state.activeId=p.id;save();emit('change',{source:'switch'});return p;
   },
@@ -236,6 +261,8 @@ const store={
     commit(st=>{
       for(const p of incoming){const ex=st.profiles[p.id];if(ex&&ex.updatedAt>=p.updatedAt)continue;st.profiles[p.id]=JSON.parse(JSON.stringify(p));}
       st.supports=mergeSupports(st.supports,incomingSupports);
+      /* A device that never set its journey adopts the imported one. */
+      if(incomingState?.journey?.set&&!st.journey.set)st.journey=JSON.parse(JSON.stringify(incomingState.journey));
     },'switch',true);
     activeId=incoming[0].id;state.activeId=activeId;save();emit('change',{source:'switch'});
     return incoming.length;
