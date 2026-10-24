@@ -13,11 +13,11 @@
 <title>Field Guide · Fortune’s Weave</title>
 <link rel="preload" href="fonts/cinzel-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/cormorant-garamond-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=37">
-<link rel="stylesheet" href="missables.css?v=37">
-<link rel="stylesheet" href="v2.css?v=37">
-<link rel="stylesheet" href="fx.css?v=37">
-<link rel="stylesheet" href="v3.css?v=37">
+<link rel="stylesheet" href="style.css?v=40">
+<link rel="stylesheet" href="missables.css?v=40">
+<link rel="stylesheet" href="v2.css?v=40">
+<link rel="stylesheet" href="fx.css?v=40">
+<link rel="stylesheet" href="v3.css?v=40">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -80,7 +80,7 @@
       <span class="weave-slot" data-weave aria-hidden="true"></span>
       <p class="subtitle">A little preparation. A stronger company.</p>
       <div class="hero-stats" id="hero-stats">
-        <button class="stat" type="button" data-jump="joinable" aria-label="Show everyone who can join"><b id="stat-recruitable">—</b><span>Can join</span></button>
+        <button class="stat" type="button" data-jump="joinable" aria-label="Show everyone you can still recruit"><b id="stat-recruitable">—</b><span>Can join</span></button>
         <button class="stat" type="button" data-jump="wishlist" aria-label="Show your wishlist"><b id="stat-wishlist">0</b><span>Wishlist</span></button>
         <button class="stat" type="button" data-jump="recruited" aria-label="Show your recruits"><b id="stat-recruited">0</b><span>Recruited</span></button>
       </div>
@@ -97,8 +97,12 @@
     <div id="filters" class="filters" hidden>
       <p class="filter-help"><span class="tri-demo inc"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg></span>Tap once: show only <span class="tri-demo exc"><svg class="ico" aria-hidden="true"><use href="#i-ban"/></svg></span>Twice: hide · Third tap clears. In search, <b>−word</b> hides matches.</p>
       <div id="filter-groups"></div>
+      <fieldset class="tri-group rec-group"><legend>Recommendations</legend>
+        <label class="switch"><input type="checkbox" id="rec-toggle" checked><span class="sw" aria-hidden="true"></span>Show “Recommended” on cards</label>
+        <p class="note">Recommended = worth recruiting on this path: supports you can only see here, someone who only joins here or is easiest to recruit here, or lots of unwatched supports with your company.</p>
+      </fieldset>
       <div class="filtergrid sortgrid">
-        <label>Sort by<select id="sort"><option value="game">Game order</option><option value="name">Name</option><option value="support">Support level</option><option value="renown">Renown</option><option value="gold">Gold required</option><option value="status">Recruitment status</option><option value="supports">Support partner count</option></select></label>
+        <label>Sort by<select id="sort"><option value="game">Game order</option><option value="recommend">Recommended first</option><option value="name">Name</option><option value="support">Support level</option><option value="renown">Renown</option><option value="gold">Gold required</option><option value="status">Recruitment status</option><option value="supports">Support partner count</option></select></label>
         <button id="direction" class="ghostbtn">↑ Ascending</button>
       </div>
       <button id="reset" class="textbutton">Reset search &amp; filters</button>
@@ -200,7 +204,7 @@
   <div class="route-tabs-wrap"><div class="route-tabs" id="route-tabs" role="tablist" aria-label="Choose a lord’s route"></div></div>
   <p id="route-status" class="sr-only" aria-live="polite"></p>
   <div class="missables-head">
-    <div class="mh-top"><p class="eyebrow" id="missables-eyebrow">Part I · Scenes &amp; Paralogues</p><button type="button" class="jr-pill" data-journey-pill><i aria-hidden="true"></i><span class="jp-text">Part I</span><svg class="ico" aria-hidden="true"><use href="#i-chev-r"/></svg></button></div>
+    <div class="mh-top"><p class="eyebrow" id="missables-eyebrow">Part I · Scenes, paralogues &amp; quests</p><button type="button" class="jr-pill" data-journey-pill><i aria-hidden="true"></i><span class="jp-text">Part I</span><svg class="ico" aria-hidden="true"><use href="#i-chev-r"/></svg></button></div>
     <div class="mh-row">
       <h1 id="missables-heading" tabindex="-1">Missables</h1>
       <div id="missables-filter" class="segmented" role="group" aria-label="Show">
@@ -214,7 +218,8 @@
       <p id="missables-progress" role="status" aria-live="polite"></p>
     </div>
   </div>
-  <p class="note hint"><svg class="ico" aria-hidden="true"><use href="#i-spark"/></svg>Tap a title for requirements, not story summaries.</p>
+  <div class="type-chips" id="type-chips" role="group" aria-label="Show these kinds of notes"></div>
+  <p class="note hint"><svg class="ico" aria-hidden="true"><use href="#i-spark"/></svg>Tap a title for requirements, not story summaries. Only scenes count towards progress.</p>
   <p id="missables-storage-warning" class="warning" role="status" hidden>Checklist storage is unavailable or unreadable. Marks work for this visit but may not be saved.</p>
   <p id="missables-load-error" class="warning" role="status" hidden>Missables notes are not available. Verified data may not be published yet, or the connection failed. No checklist has been inferred. Reload to try again.</p>
   <div id="sealed-card" class="sealed-card" role="tabpanel" hidden><span class="seal-gem" aria-hidden="true"><svg class="ico"><use href="#i-lock"/></svg></span><h2 id="sealed-title">Sealed</h2><p id="sealed-text"></p><button type="button" class="goldbtn" data-journey-pill>Update my journey</button></div>
@@ -338,12 +343,12 @@
     <div class="lord-pick" id="new-file-lords"></div>
   </div>
 </dialog>
-<script src="store.js?v=37"></script>
-<script src="fx.js?v=37" defer></script>
-<script src="app.js?v=37" defer></script>
-<script src="journey.js?v=37" defer></script>
-<script src="supports.js?v=37" defer></script>
-<script src="meals.js?v=37" defer></script>
-<script src="missables.js?v=37" defer></script>
+<script src="store.js?v=40"></script>
+<script src="fx.js?v=40" defer></script>
+<script src="app.js?v=40" defer></script>
+<script src="journey.js?v=40" defer></script>
+<script src="supports.js?v=40" defer></script>
+<script src="meals.js?v=40" defer></script>
+<script src="missables.js?v=40" defer></script>
 </body>
 </html>

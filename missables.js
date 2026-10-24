@@ -1,7 +1,7 @@
 'use strict';
 /* Missables — swipeable lord routes with per-route palettes and checklists.
    Viewed notes and the chosen route live in the active save file. */
-let missables=[],routes=[],routeIndex=0,filterMode='all';
+let missables=[],routes=[],routeIndex=0,filterMode=FG.prefs?.get('missablesFilter')==='unviewed'?'unviewed':'all';
 /* Which Part the Missables tab shows. Part I keeps the per-lord carousel; the other Parts are one timeline. */
 let mPart=null,partINotes='';
 const PART_COPY=[
@@ -12,11 +12,19 @@ const PART_COPY=[
 const isLater=()=>mPart!==null&&mPart!==1;
 const laterKey=e=>JSON.stringify(['later',e.id]);
 const laterViewed=()=>new Set(store.journey().viewed);
-let viewed=new Set(store.profile().viewed);
+/* Viewed marks are shared by every save file (one game, one set of marks). */
+let viewed=new Set(store.viewed());
 let profileId=store.profile().id;
+/* Only missable scenes count towards progress; paralogues and side quests are listed but not counted. */
+const counts=e=>e.type==='scene';
+const TYPE_TAG={paralogue:'Paralogue',quest:'Side quest'};
+const dueBy=e=>{const m=String(e.deadline||'').match(/\bby (\d{1,2} [A-Z][a-z]+)/);return m?m[1]:/end of Part I, Chapter 12/.test(e.deadline||'')?'Ch. 12':'';};
+const andList=a=>a.length<2?a.join(''):`${a.slice(0,-1).join(', ')} and ${a[a.length-1]}`;
+/* Which kinds of Part I notes to list (remembered on this device). Scenes are always counted. */
+let showTypes=new Set(FG.prefs?.get('missablesTypes')||['scene','paralogue','quest']);
 FG.onProfileChange.push(()=>{
   const p=store.profile(),switched=p.id!==profileId;
-  profileId=p.id;viewed=new Set(p.viewed);
+  profileId=p.id;viewed=new Set(store.viewed());
   paintPartTabs();
   if(isLater()){if(isMissablesVisible())renderMissables({animate:false});return;}
   if(!routes.length)return;
@@ -27,7 +35,10 @@ FG.onProfileChange.push(()=>{
 });
 let pendingScrollFix=false;
 
-const sceneKey=e=>JSON.stringify([e.route,e.id]);
+/* Side quests that carry over between paths (sources confirm it for ordinary requests) share one mark across paths;
+   others (e.g. recruitment requests) are marked per path and show where they were done. */
+const questSlug=e=>String(e.id).replace(/^[a-z]+-p1-quest-/,'');
+const sceneKey=e=>e.type==='quest'&&e.persistsAcrossPaths?JSON.stringify(['quest',questSlug(e)]):JSON.stringify([e.route,e.id]);
 const ROMAN=['I','II','III','IV','V','VI','VII','VIII'];
 const ART={
   Cai:{src:'art/cai.webp',pos:'14% 50%',lift:'22%'},
@@ -41,11 +52,19 @@ const track=$('route-carousel'),tabs=$('route-tabs'),pager=$('route-pager'),list
 
 const currentRoute=()=>routes[routeIndex];
 const routeEntries=route=>missables.filter(e=>e.route===route).sort((a,b)=>a.chapterOrder-b.chapterOrder||a.title.localeCompare(b.title));
-const routeStats=route=>{const rows=routeEntries(route);return{done:rows.filter(e=>viewed.has(sceneKey(e))).length,total:rows.length};};
+const routeStats=route=>{const rows=routeEntries(route).filter(counts);return{done:rows.filter(e=>viewed.has(sceneKey(e))).length,total:rows.length};};
+/* The same paralogue appears on several paths; show where it has already been cleared. */
+function clearedElsewhere(e){
+  if(e.type==='paralogue'&&e.owner)return missables.filter(x=>x.type==='paralogue'&&x.owner===e.owner&&x.route!==e.route&&viewed.has(sceneKey(x))).map(x=>x.route);
+  if(e.type==='quest'&&!e.persistsAcrossPaths)return missables.filter(x=>x.type==='quest'&&x.route!==e.route&&questSlug(x)===questSlug(e)&&viewed.has(sceneKey(x))).map(x=>x.route);
+  return[];
+}
+/* Where a side quest was done (marks are shared by quest, so this just names the path it was ticked on). */
+const otherPathsWith=e=>e.type==='quest'?missables.filter(x=>x.type==='quest'&&x.route!==e.route&&questSlug(x)===questSlug(e)).map(x=>x.route):[];
 const lordPortrait=route=>FG.portrait(route);
 const isMissablesVisible=()=>!$('missables-view').hidden;
 /* Record one mark at a time so other open tabs merge rather than overwrite. */
-function persistViewed(key,on){store.update(p=>{const s=new Set(p.viewed);if(on)s.add(key);else s.delete(key);p.viewed=[...s];},{quiet:true});}
+function persistViewed(key,on){store.setViewed(key,on);}
 
 /* ---------- Stage ---------- */
 function buildStage(){
@@ -72,13 +91,13 @@ function updateProgress(){
     if(slide){
       slide.querySelector('.ring').style.setProperty('--p',p.toFixed(4));
       slide.querySelector('.ring-pct').textContent=`${Math.round(p*100)}%`;
-      slide.querySelector('.lord-count').innerHTML=`<b>${done} of ${total}</b>notes viewed`;
+      slide.querySelector('.lord-count').innerHTML=`<b>${done} of ${total}</b>scenes viewed`;
     }
     tabs.children[i]?.querySelector('.tab-prog i').style.setProperty('--p',(p*100).toFixed(1)+'%');
   });
   const route=currentRoute();if(!route)return;
   const {done,total}=routeStats(route);
-  $('missables-progress').textContent=`${done} of ${total} viewed`;
+  $('missables-progress').textContent=`${done} of ${total} scenes viewed`;
   $('missables-bar-fill').style.setProperty('--p',(total?done/total*100:0)+'%');
 }
 
@@ -185,19 +204,25 @@ FG.onMissablesShown=()=>{
 };
 
 /* ---------- Checklist ---------- */
+function elsewhereHTML(e){
+  const at=clearedElsewhere(e);if(!at.length)return '';
+  const verb=e.type==='quest'?'Done':'Cleared';
+  return `<span class="cleared-elsewhere" aria-label="${verb} on ${esc(at.join(' and '))}’s path"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>${verb} on ${at.map(r=>`<img src="${esc(lordPortrait(r))}" alt="">`).join('')}${esc(at.length===1?`${at[0]}’s path`:`${at.length} paths`)}</span>`;
+}
 function rowHTML(e,i){
-  const done=viewed.has(sceneKey(e)),para=e.type==='paralogue';
-  return `<article class="missable-row${para?' paralogue':''}${done?' is-viewed':''}" data-id="${esc(e.id)}" style="--i:${i}">`+
-    `<label class="missable-check"><input type="checkbox" aria-label="Viewed: ${esc(e.title)}"${done?' checked':''}><span class="seal" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span></label>`+
-    `<button class="missable-title">${para&&e.portrait?`<span class="p-face"><img src="${esc(e.portrait)}" alt="${esc(e.owner)} portrait" width="40" height="46"></span>`:''}`+
-    `<span><span class="t-text">${esc(e.title)}</span>${para?'<small>Paralogue</small>':''}</span></button>`+
+  const done=viewed.has(sceneKey(e)),para=e.type==='paralogue',quest=e.type==='quest',face=para&&e.portrait?e.portrait:quest&&e.owner?FG.portrait(e.owner):'';
+  return `<article class="missable-row${para?' paralogue':''}${quest?' quest':''}${done?' is-viewed':''}" data-id="${esc(e.id)}" style="--i:${i}">`+
+    `<label class="missable-check"><input type="checkbox" aria-label="${quest?'Done':'Viewed'}: ${esc(e.title)}"${done?' checked':''}><span class="seal" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span></label>`+
+    `<button class="missable-title">${face?`<span class="p-face"><img src="${esc(face)}" alt="${esc(e.owner)} portrait" width="40" height="46"></span>`:quest?'<span class="q-mark" aria-hidden="true"><svg class="ico"><use href="#i-scroll"/></svg></span>':''}`+
+    `<span><span class="t-text">${esc(e.title)}</span>${TYPE_TAG[e.type]?`<small>${TYPE_TAG[e.type]}${quest&&dueBy(e)?` · by ${esc(dueBy(e))}`:''}</small>`:''}${elsewhereHTML(e)}</span></button>`+
     `<span class="missable-more" aria-hidden="true"><svg class="ico"><use href="#i-chev-r"/></svg></span></article>`;
 }
 function renderMissables({animate=true}={}){
   if(isLater())return renderLater({animate});
   const route=currentRoute();if(!route)return;
   const routeRows=routeEntries(route);
-  const rows=routeRows.filter(e=>filterMode==='all'||!viewed.has(sceneKey(e)));
+  paintTypeChips(routeRows);
+  const rows=routeRows.filter(e=>showTypes.has(e.type)&&(filterMode==='all'||!viewed.has(sceneKey(e))));
   updateProgress();
   $('missables-empty').hidden=rows.length>0;
   $('missables-empty').textContent=routeRows.length?'All listed notes viewed.':'No verified notes available for this route. This does not confirm there are none.';
@@ -230,7 +255,7 @@ list.addEventListener('change',event=>{
   if(input.checked&&!reduceMotion()){void row.offsetWidth;row.classList.add('just-sealed');}
   updateProgress();
   const {done,total}=routeStats(currentRoute());
-  if(input.checked&&total&&done===total)FG.toast(`${currentRoute()}’s notes complete ✦`);
+  if(input.checked&&counts(entry)&&total&&done===total)FG.toast(`${currentRoute()}’s scenes complete ✦`);
   if(filterMode==='unviewed'&&input.checked){
     row.classList.add('missable-row-leaving');input.disabled=true;
     setTimeout(()=>{
@@ -256,11 +281,15 @@ function sceneDetailHTML(entry){
       (sources.length?`<details class="missable-sources"><summary>Sources — unfiltered pages may contain spoilers</summary><ul>${sources.map((url,i)=>`<li><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">Source ${i+1}</a></li>`).join('')}</ul></details>`:'');
   }
   const sources=Array.isArray(entry.sources)?entry.sources.filter(url=>typeof url==='string'&&url.startsWith('https://')):[];
-  return `<div class="md-tags"><span class="md-tag route">${esc(entry.route)}</span><span class="md-tag">Chapter ${esc(entry.chapter)}</span>${para?'<span class="md-tag para">Paralogue</span>':''}</div>`+
-    `<div class="md-hero">${para&&entry.portrait?`<span class="p-face"><img src="${esc(entry.portrait)}" alt="${esc(entry.owner)} portrait"></span>`:''}<h2 id="missables-detail-title">${esc(entry.title)}</h2></div>`+
+  const quest=entry.type==='quest',face=para&&entry.portrait?entry.portrait:quest&&entry.owner?FG.portrait(entry.owner):'',elsewhere=clearedElsewhere(entry);
+  return `<div class="md-tags"><span class="md-tag route">${esc(entry.route)}</span><span class="md-tag">Chapter ${esc(entry.chapter)}</span>${para?'<span class="md-tag para">Paralogue</span>':quest?'<span class="md-tag para">Side quest</span>':''}</div>`+
+    `<div class="md-hero">${face?`<span class="p-face"><img src="${esc(face)}" alt="${esc(entry.owner)} portrait"></span>`:''}<h2 id="missables-detail-title">${esc(entry.title)}</h2></div>`+
+    (elsewhere.length?`<p class="good-note"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Already ${quest?'done':'cleared'} on ${esc(elsewhere.map(r=>`${r}’s`).join(' and '))} path${elsewhere.length>1?'s':''}${quest?'.':' — one clear is usually enough for what it unlocks.'}</p>`:'')+
     (entry.certainty==='uncertain'?'<p class="warning">Uncertain — requirements need confirmation.</p>':'')+
+    (quest&&entry.reward?`<p class="note"><b>Reward:</b> ${esc(entry.reward)}</p>`:'')+
+    (quest&&otherPathsWith(entry).length?`<p class="note">Also offered on ${esc(andList(otherPathsWith(entry).map(r=>`${r}’s`)))} path${otherPathsWith(entry).length>1?'s':''}. ${entry.persistsAcrossPaths?'Completed requests carry over between paths, so one tick covers all of them.':'Guides don’t confirm this one carries over, so it’s ticked per path.'}</p>`:'')+
     `<dl class="facts">${FIELDS.map(f=>`<dt><svg class="ico" aria-hidden="true"><use href="#${FIELD_META[f][1]}"/></svg>${FIELD_META[f][0]}</dt><dd>${esc(entry[f]||'Not verified')}</dd>`).join('')}</dl>`+
-    `<div class="md-actions"><button type="button" id="missables-detail-toggle" class="${done?'ghostbtn':'goldbtn'}" aria-pressed="${done}">${done?'✓ Viewed · tap to undo':'Mark as viewed'}</button></div>`+
+    `<div class="md-actions"><button type="button" id="missables-detail-toggle" class="${done?'ghostbtn':'goldbtn'}" aria-pressed="${done}">${done?`✓ ${quest?'Done':'Viewed'} · tap to undo`:quest?'Mark as done':'Mark as viewed'}</button></div>`+
     (sources.length?`<details class="missable-sources"><summary>Sources — unfiltered pages may contain spoilers</summary><ul>${sources.map((url,i)=>`<li><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">Source ${i+1}</a></li>`).join('')}</ul></details>`:'');
 }
 function bindDetailToggle(entry){
@@ -294,9 +323,28 @@ FG.wireSheet($('missables-detail'),$('close-missables'),()=>{(activeSceneButton&
 
 $('missables-filter').addEventListener('click',e=>{
   const b=e.target.closest('[data-filter]');if(!b||b.disabled)return;
-  filterMode=b.dataset.filter;
+  filterMode=b.dataset.filter;FG.prefs?.set('missablesFilter',filterMode);
   $('missables-filter').querySelectorAll('[data-filter]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
   renderMissables();
+});
+
+/* ---------- Note-type chips (Part I) ---------- */
+const TYPE_CHIPS=[['scene','Scenes'],['paralogue','Paralogues'],['quest','Side quests']];
+function paintTypeChips(rows){
+  const box=$('type-chips');if(!box)return;
+  if(!box.childElementCount)box.innerHTML=TYPE_CHIPS.map(([k,l])=>`<button type="button" class="type-chip" data-type="${k}" aria-pressed="true"><span class="tc-mark" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span>${l}<b></b></button>`).join('');
+  box.querySelectorAll('[data-type]').forEach(b=>{
+    const k=b.dataset.type,n=rows.filter(e=>e.type===k).length,left=rows.filter(e=>e.type===k&&!viewed.has(sceneKey(e))).length;
+    b.setAttribute('aria-pressed',String(showTypes.has(k)));b.hidden=!n;
+    b.querySelector('b').textContent=left===n?n:`${left}/${n}`;
+    b.setAttribute('aria-label',`${TYPE_CHIPS.find(t=>t[0]===k)[1]}: ${left} of ${n} not done${showTypes.has(k)?', shown':', hidden'}`);
+  });
+}
+$('type-chips')?.addEventListener('click',e=>{
+  const b=e.target.closest('[data-type]');if(!b)return;
+  const k=b.dataset.type;if(showTypes.has(k)){if(showTypes.size>1)showTypes.delete(k);else return;}else showTypes.add(k);
+  FG.prefs?.set('missablesTypes',[...showTypes]);renderMissables({animate:false});
+  $('type-chips').querySelector(`[data-type="${k}"]`)?.focus();
 });
 
 /* ---------- Parts: Prologue, Part II and Part III ---------- */
@@ -316,7 +364,7 @@ function applyPart({animate=true}={}){
   const later=isLater(),j=store.journey(),view=$('missables-view');
   view.classList.toggle('later-part',later);
   const stage=$('part-stage');stage.hidden=!later;
-  $('missables-eyebrow').textContent=later?`${PART_COPY[mPart].name} · Missable notes`:'Part I · Scenes & Paralogues';
+  $('missables-eyebrow').textContent=later?`${PART_COPY[mPart].name} · Missable notes`:'Part I · Scenes, paralogues & quests';
   $('missables-footnote').textContent=later?'Check off viewed notes · Shared by every save file — after Part I the game is one timeline.':'Check off viewed notes · Saved automatically in this save file, separately for each route.';
   if(later){
     const c=PART_COPY[mPart];
@@ -340,8 +388,8 @@ function laterRows(){
   return all.filter(e=>e.part===mPart&&FG.laterVisible(e,j)).sort((a,b)=>(+a.chapterOrder||0)-(+b.chapterOrder||0)||all.indexOf(a)-all.indexOf(b));
 }
 function laterProgress(){
-  const rows=laterRows(),seen=laterViewed(),done=rows.filter(e=>seen.has(laterKey(e))).length;
-  $('missables-progress').textContent=rows.length?`${done} of ${rows.length} viewed`:'';
+  const rows=laterRows().filter(counts),seen=laterViewed(),done=rows.filter(e=>seen.has(laterKey(e))).length;
+  $('missables-progress').textContent=rows.length?`${done} of ${rows.length} scenes viewed`:'No scenes to count in this Part';
   $('missables-bar-fill').style.setProperty('--p',(rows.length?done/rows.length*100:0)+'%');
 }
 function renderLater({animate=true}={}){
@@ -359,6 +407,7 @@ function renderLater({animate=true}={}){
   const all=laterRows(),seen=laterViewed();
   $('missables-coverage').textContent=(FG.data.laterNotes?.[String(mPart)]||[]).join(' ');
   const rows=all.filter(e=>filterMode==='all'||!seen.has(laterKey(e)));
+  /* (Only scenes count towards the progress figure, as in Part I.) */
   laterProgress();
   $('missables-empty').hidden=rows.length>0;
   $('missables-empty').textContent=all.length?'All listed notes viewed.':'No verified notes for this Part yet. This does not confirm there are none.';
@@ -393,13 +442,17 @@ store.on('change',e=>{
 /* ---------- Load ---------- */
 $('missables-progress').textContent='Opening field notes…';
 const filterButtons=[...$('missables-filter').querySelectorAll('button')];
+/* Show the remembered All / Unviewed choice. */
+filterButtons.forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.filter===filterMode)));
 filterButtons.forEach(b=>{b.disabled=true;});
 let missablesRequested=false;
 FG.loadMissables=()=>{
  if(missablesRequested)return;
  missablesRequested=true;
- fetch(`./missables.json?v=${FG.DATA_V||'1'}`).then(r=>{if(!r.ok)throw Error('Notes unavailable');return r.json();}).then(d=>{
-  if(!Array.isArray(d.routes)||!Array.isArray(d.entries)||!Array.isArray(d.coverageNotes)||!d.entries.every(e=>e&&typeof e.id==='string'&&typeof e.route==='string'&&typeof e.title==='string'&&typeof e.chapter==='string'&&Number.isFinite(e.chapterOrder)&&['scene','paralogue'].includes(e.type)))throw Error('Invalid notes');
+ Promise.all([fetch(`./missables.json?v=${FG.DATA_V||'1'}`).then(r=>{if(!r.ok)throw Error('Notes unavailable');return r.json();}),
+   fetch(`./data/missables-quests.json?v=${FG.DATA_V||'1'}`).then(r=>r.ok?r.json():{entries:[]}).catch(()=>({entries:[]}))]).then(([d,q])=>{
+  if(Array.isArray(q.entries))d={...d,entries:[...d.entries,...q.entries.filter(e=>e&&e.type==='quest'&&d.routes.includes(e.route))],coverageNotes:[...d.coverageNotes,...(q.coverageNotes||[])]};
+  if(!Array.isArray(d.routes)||!Array.isArray(d.entries)||!Array.isArray(d.coverageNotes)||!d.entries.every(e=>e&&typeof e.id==='string'&&typeof e.route==='string'&&typeof e.title==='string'&&typeof e.chapter==='string'&&Number.isFinite(+e.chapterOrder)&&['scene','paralogue','quest'].includes(e.type)))throw Error('Invalid notes');
   missables=d.entries;
   routes=d.routes.filter(r=>typeof r==='string');
   if(!routes.length)routes=[...new Set(missables.map(e=>e.route))];

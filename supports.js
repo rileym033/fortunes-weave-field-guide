@@ -2,7 +2,8 @@
 /* Supports — track support conversations between any two characters. */
 (function(){
 const store=FG.store,D=FG.data;
-let focus=null,mode='next',companyOnly=false,part1Only=false,pairA=null,pairB=null,pairReturn=null,castBuilt=false;
+const SP=FG.prefs.get('supports')||{};
+let focus=null,mode=['next','all','done'].includes(SP.mode)?SP.mode:'next',companyOnly=!!SP.company,part1Only=!!SP.openNow,pairA=null,pairB=null,pairReturn=null,castBuilt=false;
 const lvlFor=r=>FG.RANK_LEVEL[r];
 /* Every pair starts at support level 1, as in the game; the guide stores only levels above that. */
 const levelOf=(a,b)=>store.supports()[FG.pairKey(a,b)]?.level??1;
@@ -161,11 +162,15 @@ $('sp-list').addEventListener('click',e=>{
   }else if(e.target.closest('.bond-open')){openPair(focus,n,()=>[...$('sp-list').querySelectorAll('.bond')].find(x=>x.dataset.partner===n)?.querySelector('.bond-open'));}
 });
 $('sp-filter').addEventListener('click',e=>{
-  const b=e.target.closest('[data-filter]');if(!b)return;mode=b.dataset.filter;
+  const b=e.target.closest('[data-filter]');if(!b)return;mode=b.dataset.filter;saveSp();
   $('sp-filter').querySelectorAll('[data-filter]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));render();
 });
-$('sp-company-only').addEventListener('change',e=>{companyOnly=e.target.checked;render();});
-$('sp-part1').addEventListener('change',e=>{part1Only=e.target.checked;render();});
+$('sp-company-only').addEventListener('change',e=>{companyOnly=e.target.checked;saveSp();render();});
+$('sp-part1').addEventListener('change',e=>{part1Only=e.target.checked;saveSp();render();});
+/* Remember the view choices on this device. */
+function saveSp(){FG.prefs.set('supports',{mode,company:companyOnly,openNow:part1Only});}
+$('sp-company-only').checked=companyOnly;$('sp-part1').checked=part1Only;
+$('sp-filter').querySelectorAll('[data-filter]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.filter===mode)));
 $('sp-focus').addEventListener('click',()=>{
   FG.pickCharacter({title:'Whose bonds?',current:focus,returnFocus:$('sp-focus'),names:FG.everyone().filter(n=>(D.partners.get(n)||[]).length),
     badge:n=>{const ps=D.partners.get(n)||[];let t=0,d=0;ps.forEach(m=>{t+=FG.pair(n,m).ranks.length;d+=FG.seen(n,m).length;});return `<small class="pick-meta">${d}/${t}</small>`;}},

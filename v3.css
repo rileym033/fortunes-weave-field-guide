@@ -283,3 +283,42 @@ body.bulk-open .toast{bottom:calc(env(safe-area-inset-bottom) + 86px + var(--bul
 .part-stage .motes{position:absolute;inset:0;z-index:-1;pointer-events:none}
 .part-stage .ps-numeral{filter:drop-shadow(0 0 16px color-mix(in srgb,var(--pg) 70%,transparent))}
 .part-stage .ps-name,.part-stage .ps-sub{text-shadow:0 2px 12px #000}
+
+/* ================= v3.1: card flags, recommendations, missables types ================= */
+.card-flags{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:7px}
+.rec-badge{position:relative;overflow:hidden;display:inline-flex;align-items:center;gap:5px;padding:3px 9px 3px 7px;border-radius:999px;
+  background:linear-gradient(180deg,#f8e7b0 0%,#e0bc6a 52%,#b48a39 100%);color:#1b1306;font:700 11px/1.3 var(--caps);letter-spacing:.08em;text-transform:uppercase;
+  box-shadow:0 0 14px -3px rgba(255,214,140,.75),inset 0 1px 0 rgba(255,255,255,.6)}
+.rec-badge .ico{width:12px;height:12px;stroke-width:2.4}
+.rec-badge::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 35%,rgba(255,255,255,.75) 50%,transparent 65%);transform:translateX(-130%);animation:sweep 4.5s ease-in-out 1s infinite}
+.unseen-pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px 3px 7px;border-radius:999px;border:1px solid rgba(120,213,198,.55);
+  background:rgba(120,213,198,.12);color:#bff0e8;font:700 12px/1.25 var(--ui);font-variant-numeric:tabular-nums}
+.unseen-pill .ico{width:13px;height:13px;color:var(--ok)}
+.rec-reasons{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.rec-reasons li{display:flex;align-items:center;gap:8px;font-size:14.5px;line-height:1.35;color:var(--text)}
+.rec-reasons li::before{content:"";flex:none;width:9px;height:9px;transform:rotate(45deg);border-radius:2px;background:var(--gold-grad);box-shadow:0 0 8px rgba(255,214,140,.6)}
+.rec-reasons li.rr-bond::before{background:var(--ok);box-shadow:0 0 8px rgba(120,213,198,.6)}
+.rec-group .note{margin:4px 0 0;font-size:13px;line-height:1.45}
+/* Missables: side quests and paralogues cleared on another path */
+.missable-row.quest .q-mark{display:grid;place-items:center;width:40px;height:46px;flex:none;border-radius:10px;border:1px solid var(--line-2);background:rgba(255,240,200,.06)}
+.missable-row.quest .q-mark .ico{width:20px;height:20px;color:var(--gold)}
+.cleared-elsewhere{display:inline-flex;align-items:center;gap:5px;margin-top:5px;padding:2px 9px 2px 5px;border-radius:999px;border:1px solid rgba(120,213,198,.45);
+  background:rgba(120,213,198,.1);color:#bff0e8;font:700 11.5px/1.3 var(--ui)}
+.cleared-elsewhere .ico{width:12px;height:12px;color:var(--ok);stroke-width:2.6}
+.cleared-elsewhere img{width:18px;height:18px;border-radius:50%;object-fit:cover;object-position:50% 18%;border:1px solid var(--gold);margin-right:-2px}
+.missable-title>span:last-child{display:flex;flex-direction:column;align-items:flex-start}
+.good-note{display:flex;gap:8px;align-items:flex-start;margin:10px 0;padding:10px 12px;border-radius:12px;background:rgba(120,213,198,.1);border:1px solid rgba(120,213,198,.35);color:#d7f5f0;font-size:14px;line-height:1.45}
+.good-note .ico{flex:none;width:16px;height:16px;margin-top:2px;color:var(--ok)}
+@media (prefers-reduced-motion:reduce){.rec-badge::after{animation:none}}
+
+/* Missables: note-type chips */
+.type-chips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 2px}
+.type-chip{display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:0 12px 0 8px;border-radius:999px;border:1px solid var(--line-2);background:rgba(4,14,15,.5);color:var(--muted);font:650 13px/1 var(--ui);cursor:pointer}
+.type-chip b{min-width:1.4em;padding:2px 6px;border-radius:999px;background:rgba(255,240,200,.08);color:var(--gold-hi);font:700 11.5px/1.3 var(--ui);font-variant-numeric:tabular-nums}
+.type-chip .tc-mark{position:relative;display:grid;place-items:center;width:18px;height:18px}
+.type-chip .tc-mark::before{content:"";position:absolute;inset:2px;transform:rotate(45deg);border-radius:3px;border:1.5px solid var(--line-2);transition:background .25s,border-color .25s}
+.type-chip .tc-mark .ico{position:relative;width:10px;height:10px;color:#2c1b05;stroke-width:3;opacity:0;transition:opacity .2s}
+.type-chip[aria-pressed="true"]{color:var(--ivory);border-color:var(--gold-2);background:linear-gradient(160deg,rgba(255,240,200,.12),rgba(255,240,200,.03))}
+.type-chip[aria-pressed="true"] .tc-mark::before{background:var(--gold-grad);border-color:#fff1c4}
+.type-chip[aria-pressed="true"] .tc-mark .ico{opacity:1}
+.missables-view.later-part .type-chips{display:none}
