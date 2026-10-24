@@ -19,7 +19,7 @@ FG.planMeal=names=>{
 function pairInfo(a,b){
   const pr=FG.pair(a,b);
   if(!pr)return{has:false,text:'No support conversations listed'};
-  const next=FG.nextRank(a,b),lv=store.profile().supports[FG.pairKey(a,b)]?.level??null;
+  const next=FG.nextRank(a,b),lv=store.supports()[FG.pairKey(a,b)]?.level??null;
   if(!next)return{has:true,done:true,text:'Every listed conversation viewed',max:pr.maxRank};
   const need=FG.RANK_LEVEL[next];
   return{has:true,next,need,lv,ready:lv!==null&&lv>=need,remaining:pr.ranks.length-FG.seen(a,b).length,max:pr.maxRank,

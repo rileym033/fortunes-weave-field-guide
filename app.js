@@ -79,7 +79,10 @@ FG.wireSheet=(dialog,closeButton,onClose)=>{
 
 /* ---------- Data ---------- */
 const D=FG.data={roster:null,supports:null,meals:null,byName:new Map(),pairs:new Map(),partners:new Map()};
-const getJSON=url=>fetch(url).then(r=>{if(!r.ok)throw Error(url);return r.json();});
+/* Bumped with each data release so phones never pair new code with cached old data. */
+const DATA_V='33';
+FG.DATA_V=DATA_V;
+const getJSON=url=>fetch(`${url}?v=${DATA_V}`).then(r=>{if(!r.ok)throw Error(url);return r.json();});
 FG.pairKey=(a,b)=>a<b?`${a}|${b}`:`${b}|${a}`;
 FG.pair=(a,b)=>D.pairs.get(FG.pairKey(a,b));
 FG.portrait=name=>D.byName.get(name)?.portrait||D.roster?.lordPortraits?.[name]||(LORDS.includes(name)?`portraits/${name.toLowerCase()}.webp`:'');
@@ -90,7 +93,7 @@ FG.routeOf=(name,lord=FG.lord())=>D.byName.get(name)?.routes?.[lord]||null;
 FG.everyone=()=>[...LORDS,...(D.roster?.characters||[]).map(c=>c.name)];
 /* In your company = your lord, their starting team, or someone you marked recruited. */
 FG.inCompany=(name,p=store.profile())=>name===p.lord||FG.team(p.lord).includes(name)||p.recruited.includes(name);
-FG.seen=(a,b)=>store.profile().supports[FG.pairKey(a,b)]?.seen||[];
+FG.seen=(a,b)=>store.supports()[FG.pairKey(a,b)]?.seen||[];
 FG.nextRank=(a,b)=>{const pr=FG.pair(a,b);if(!pr)return null;const s=FG.seen(a,b);return pr.ranks.find(r=>!s.includes(r))||null;};
 FG.RANK_LEVEL=RANK_LEVEL;
 FG.ready=Promise.all([getJSON('data/roster.json'),getJSON('data/supports.json')]).then(([roster,supports])=>{
@@ -107,10 +110,10 @@ FG.loadMeals=()=>FG.mealsReady||(FG.mealsReady=getJSON('data/meals.json').then(m
 /* ---------- Company: tri-state filters ---------- */
 let tab='all',ascending=true,activeName=null;
 const filterState=new Map();               // "group:key" -> 'inc' | 'exc'
-const statusKey=rt=>!rt?'unknown':rt.status==='Yes'?'optional':rt.status==='No'?'no':/tutorial/i.test(rt.status)?'tutorial':'auto';
-const STATUS_LABEL={optional:'Optional recruit',auto:'Automatic team',tutorial:'Tutorial recruit',no:'Not recruitable',unknown:'No data for this route'};
-const STATUS_SHORT={optional:'Optional',auto:'Team',tutorial:'Tutorial',no:'No',unknown:'—'};
-const STATUS_CLASS={optional:'s-optional',auto:'s-auto',tutorial:'s-tutorial',no:'s-no',unknown:'s-no'};
+const statusKey=rt=>!rt?'unknown':rt.status==='Yes'?'optional':rt.status==='No'?'no':rt.status==='Prologue'?'prologue':rt.status==='Later'?'later':/tutorial/i.test(rt.status)?'tutorial':'auto';
+const STATUS_LABEL={optional:'Optional recruit',auto:'Automatic team',tutorial:'Tutorial recruit',prologue:'Prologue companion',later:'Later recruit',no:'Not recruitable',unknown:'No data for this route'};
+const STATUS_SHORT={optional:'Optional',auto:'Team',tutorial:'Tutorial',prologue:'Prologue',later:'Later',no:'No',unknown:'—'};
+const STATUS_CLASS={optional:'s-optional',auto:'s-auto',tutorial:'s-tutorial',prologue:'s-auto',later:'s-tutorial',no:'s-no',unknown:'s-no'};
 FG.statusKey=statusKey;FG.STATUS_LABEL=STATUS_LABEL;FG.STATUS_CLASS=STATUS_CLASS;
 const hasItems=rt=>!!rt&&!!rt.materials&&!/^(none listed|—|-)$/i.test(rt.materials.trim());
 const hasGold=rt=>!!rt&&/\d/.test(rt.gold||'');
@@ -118,7 +121,7 @@ const hasExtra=rt=>!!rt&&Array.isArray(rt.steps)&&rt.steps.length>0;
 function filterGroups(){
   const lord=FG.lord(),teamAll=[lord,...FG.team(lord)];
   return[
-    {id:'status',label:'Recruitment',opts:[['optional','Optional recruit'],['auto','Automatic team'],['tutorial','Tutorial recruit'],['no','Not recruitable']],test:(c,k)=>statusKey(FG.routeOf(c.name))===k},
+    {id:'status',label:'Recruitment',opts:[['optional','Optional recruit'],['auto','Automatic team'],['tutorial','Tutorial recruit'],['prologue','Prologue companion'],['later','Later recruit'],['no','Not recruitable']],test:(c,k)=>statusKey(FG.routeOf(c.name))===k},
     {id:'marks',label:'Your marks',opts:[['wishlist','Wishlist'],['recruited','Recruited']],test:(c,k)=>store.profile()[k].includes(c.name)},
     {id:'partner',label:`Supports with ${lord}’s team`,opts:[...teamAll.map(n=>[n,n,true]),['none','No team supports listed']],
       test:(c,k)=>k==='none'?!teamAll.some(n=>n!==c.name&&FG.pair(c.name,n)):c.name!==k&&!!FG.pair(c.name,k)},
@@ -323,7 +326,7 @@ function bondsSection(name){
   const team=FG.team();
   const partners=(D.partners.get(name)||[]).slice().sort((a,b)=>(FG.isLord(b)-FG.isLord(a))||(team.includes(b)-team.includes(a))||a.localeCompare(b));
   if(!partners.length)return '<p class="unknown">No support conversations listed.</p>';
-  return `<div class="mini-bonds">${partners.map(n=>{const pr=FG.pair(name,n),s=FG.seen(name,n);return `<button type="button" class="mini-bond" data-pair="${esc(name)}|${esc(n)}"><img src="${esc(FG.portrait(n))}" alt="" loading="lazy"><span>${esc(n)}</span><span class="pips" aria-label="${s.length} of ${pr.ranks.length} viewed">${pr.ranks.map(r=>`<i class="${s.includes(r)?'on':''}">${r}</i>`).join('')}</span></button>`;}).join('')}</div>`;
+  return `<div class="mini-bonds">${partners.map(n=>{const pr=FG.pair(name,n),s=FG.seen(name,n);return `<button type="button" class="mini-bond" data-pair="${esc(name)}|${esc(n)}"><img src="${esc(FG.portrait(n))}" alt="" loading="lazy"><span>${esc(n)}</span><span class="pips" aria-label="${s.length} of ${pr.ranks.length} viewed">${['C','B','A'].map(r=>`<i class="${!pr.ranks.includes(r)?'gap':s.includes(r)?'on':''}">${r}</i>`).join('')}</span></button>`;}).join('')}</div>`;
 }
 function foodSection(name){
   const m=D.meals;if(!m)return '';
@@ -335,10 +338,11 @@ function foodSection(name){
 }
 function recruitSteps(rt,sk){
   if(!rt||sk==='no')return '<span class="unknown">Not recruitable on this route.</span>';
-  if(sk==='auto')return 'Joins automatically.';
   const steps=rt.steps||[];
-  const base=`<li class="step-base">Reach support level <b>${rt.support??'—'}</b> with ${esc(FG.lord())} and renown <b>${rt.renown??'—'}</b></li>`;
-  return `<ol class="steps">${base}${steps.map(t=>`<li>${esc(t)}</li>`).join('')}</ol>`+(steps.length?'':'<p class="note">No extra steps listed — the levels above are enough.</p>');
+  if((sk==='auto'||sk==='prologue')&&!steps.length)return 'Joins automatically.';
+  /* Levels only matter when the guide lists them (later recruits usually join without them). */
+  const base=rt.support!=null||rt.renown!=null?`<li class="step-base">Reach support level <b>${rt.support??'—'}</b> with ${esc(FG.lord())} and renown <b>${rt.renown??'—'}</b></li>`:'';
+  return `<ol class="steps">${base}${steps.map(t=>`<li>${esc(t)}</li>`).join('')}</ol>`+(steps.length||!base?'':'<p class="note">No extra steps listed — the levels above are enough.</p>');
 }
 function showDetail(name,open=true){
   const c=D.byName.get(name);if(!c)return;
@@ -401,8 +405,7 @@ FG.wireSheet($('picker'),$('close-picker'),()=>{const f=pickerOpts.returnFocus;p
 /* ---------- Save files ---------- */
 const ago=t=>{const s=Math.round((Date.now()-t)/1000);if(s<10)return 'just now';if(s<60)return `${s}s ago`;const m=Math.round(s/60);if(m<60)return `${m} min ago`;const h=Math.round(m/60);if(h<24)return `${h} h ago`;return new Date(t).toLocaleDateString();};
 function fileStats(p){
-  const sup=Object.values(p.supports).reduce((n,v)=>n+(v.seen?.length||0),0);
-  return `${p.recruited.length} recruited · ${sup} supports · ${p.viewed.length} missables`;
+  return `${p.recruited.length} recruited · ${p.wishlist.length} wishlisted · ${p.viewed.length} missables`;
 }
 function fileHTML(p,active){
   return `<div class="file${active?' active':''}" data-file="${esc(p.id)}">`+

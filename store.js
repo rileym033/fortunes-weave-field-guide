@@ -4,7 +4,9 @@
    No save/load buttons: the newest valid copy is restored on launch.
    Changes are recorded as small operations so two open tabs merge instead of
    overwriting each other: when another tab's newer state arrives without one of
-   our recent operations, that operation is re-applied on top of it. */
+   our recent operations, that operation is re-applied on top of it.
+   Support conversations are shared by every save file (they carry across routes in the game too);
+   a copy is also written into each profile so older versions of the guide never lose them. */
 (function(){
 const FG=window.FG=window.FG||{};
 const KEY='fwfg-save-v2';
@@ -16,15 +18,29 @@ const emit=(type,detail)=>(listeners[type]||[]).forEach(fn=>{try{fn(detail);}cat
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const strArr=a=>Array.isArray(a)?a.filter(x=>typeof x==='string'&&x.length<300).slice(0,5000):[];
 
-function normProfile(p){
-  if(!p||typeof p!=='object'||typeof p.id!=='string'||!LORDS.includes(p.lord))return null;
-  const supports={};
-  if(p.supports&&typeof p.supports==='object')for(const [k,v] of Object.entries(p.supports)){
+function normSupports(obj){
+  const out={};
+  if(obj&&typeof obj==='object')for(const [k,v] of Object.entries(obj)){
     if(typeof k!=='string'||!v||typeof v!=='object')continue;
     const seen=strArr(v.seen).filter(r=>['C','B','A'].includes(r));
     const level=Number.isInteger(v.level)&&v.level>=0&&v.level<=5?v.level:null;
-    if(seen.length||level!==null)supports[k]={seen,level};
+    if(seen.length||level!==null)out[k]={seen:['C','B','A'].filter(r=>seen.includes(r)),level};
   }
+  return out;
+}
+/* Union of viewed ranks, highest recorded level — nothing a save file knew is ever dropped. */
+function mergeSupports(...maps){
+  const out={};
+  for(const m of maps)for(const [k,v] of Object.entries(m||{})){
+    const cur=out[k]||{seen:[],level:null};
+    const seen=new Set([...cur.seen,...v.seen]);
+    out[k]={seen:['C','B','A'].filter(r=>seen.has(r)),level:v.level===null?cur.level:cur.level===null?v.level:Math.max(cur.level,v.level)};
+  }
+  return out;
+}
+function normProfile(p){
+  if(!p||typeof p!=='object'||typeof p.id!=='string'||!LORDS.includes(p.lord))return null;
+  const supports=normSupports(p.supports);
   const seats=Array.isArray(p.meal?.seats)?p.meal.seats.slice(0,3).map(s=>typeof s==='string'?s:null):[p.lord,null,null];
   while(seats.length<3)seats.push(null);
   return{id:p.id,name:String(p.name||`${p.lord}’s journey`).slice(0,40),lord:p.lord,
@@ -37,7 +53,9 @@ function normState(s){
   const profiles={};
   for(const p of Object.values(s.profiles)){const n=normProfile(p);if(n)profiles[n.id]=n;}
   const ids=Object.keys(profiles);if(!ids.length)return null;
-  return{schema:2,savedAt:+s.savedAt||0,activeId:profiles[s.activeId]?s.activeId:ids[0],profiles,
+  const supports=mergeSupports(normSupports(s.supports),...Object.values(profiles).map(p=>p.supports));
+  for(const p of Object.values(profiles))delete p.supports;
+  return{schema:2,savedAt:+s.savedAt||0,activeId:profiles[s.activeId]?s.activeId:ids[0],profiles,supports,
     migratedV1:!!s.migratedV1,ops:strArr(s.ops).slice(-OP_MEMORY)};
 }
 const parse=text=>{try{return normState(JSON.parse(text));}catch{return null;}};
@@ -92,13 +110,18 @@ async function idbWrite(text){
 let state=parse(lsRead());
 if(!state){
   const p=fromV1();
-  state={schema:2,savedAt:0,activeId:p.id,profiles:{[p.id]:p},migratedV1:true,ops:[]};
+  delete p.supports;
+  state={schema:2,savedAt:0,activeId:p.id,profiles:{[p.id]:p},supports:{},migratedV1:true,ops:[]};
 }
 let activeId=state.activeId;               // per-tab: another tab switching files doesn't yank this one
 let idbOK=null,persisted=null,lastSaved=state.savedAt||0,dirtyIdb=0,idbPending=false;
 const myOps=[];                            // {id,at,apply}
 
-function serialize(){return JSON.stringify({...state,activeId});}
+function serialize(){
+  const profiles={};
+  for(const [id,p] of Object.entries(state.profiles))profiles[id]={...p,supports:state.supports};
+  return JSON.stringify({...state,activeId,profiles});
+}
 function save(){
   state.savedAt=Math.max(Date.now(),(state.savedAt||0)+1);
   const text=serialize();
@@ -181,8 +204,11 @@ const store={
   /* Explicit set operations merge cleanly between tabs. */
   setMember(list,name,on){commit(onProfile(store.profile().id,p=>{const a=p[list].filter(n=>n!==name);p[list]=on?[...a,name]:a;}));},
   toggle(list,name){const added=!store.profile()[list].includes(name);store.setMember(list,name,added);return added;},
+  /* Shared support progress (all save files). */
+  supports(){return state.supports;},
+  updateSupports(fn,{quiet=false}={}){commit(st=>{fn(st.supports);},'local',quiet);},
   create(lord,name){
-    const p=newProfile(lord,name);
+    const p=newProfile(lord,name);delete p.supports;
     commit(st=>{if(!st.profiles[p.id])st.profiles[p.id]=JSON.parse(JSON.stringify(p));},'switch',true);
     activeId=p.id;state.activeId=p.id;save();emit('change',{source:'switch'});return p;
   },
@@ -199,14 +225,18 @@ const store={
   importCode(code){
     const c=String(code).replace(/\s+/g,'');
     const m2=c.match(/^TFG2\.([A-Za-z0-9+/=]{8,4000000})$/),m1=c.match(/^TFG1\.([A-Za-z0-9+/=]{8,400000})$/);
-    let incoming=[];
-    if(m2){const s=normState(JSON.parse(decodeURIComponent(escape(atob(m2[1])))));if(!s)throw Error('shape');incoming=Object.values(s.profiles);}
+    let incoming=[],incomingState=null;
+    if(m2){const s=normState(JSON.parse(decodeURIComponent(escape(atob(m2[1])))));if(!s)throw Error('shape');incoming=Object.values(s.profiles);incomingState=s;}
     else if(m1){
       const p=JSON.parse(decodeURIComponent(escape(atob(m1[1]))));
       if(!p||p.app!=='theodora-field-guide'||p.v!==1)throw Error('shape');
-      const n=newProfile('Theodora','Imported journey');n.wishlist=strArr(p.wishlist);n.recruited=strArr(p.recruited);n.viewed=strArr(p.viewed);incoming=[n];
+      const n=newProfile('Theodora','Imported journey');delete n.supports;n.wishlist=strArr(p.wishlist);n.recruited=strArr(p.recruited);n.viewed=strArr(p.viewed);incoming=[n];
     }else throw Error('format');
-    commit(st=>{for(const p of incoming){const ex=st.profiles[p.id];if(ex&&ex.updatedAt>=p.updatedAt)continue;st.profiles[p.id]=JSON.parse(JSON.stringify(p));}},'switch',true);
+    const incomingSupports=incomingState?incomingState.supports:{};
+    commit(st=>{
+      for(const p of incoming){const ex=st.profiles[p.id];if(ex&&ex.updatedAt>=p.updatedAt)continue;st.profiles[p.id]=JSON.parse(JSON.stringify(p));}
+      st.supports=mergeSupports(st.supports,incomingSupports);
+    },'switch',true);
     activeId=incoming[0].id;state.activeId=activeId;save();emit('change',{source:'switch'});
     return incoming.length;
   },
