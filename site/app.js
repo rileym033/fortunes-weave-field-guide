@@ -83,7 +83,7 @@ FG.wireSheet=(dialog,closeButton,onClose)=>{
 /* ---------- Data ---------- */
 const D=FG.data={roster:null,supports:null,meals:null,byName:new Map(),pairs:new Map(),partners:new Map()};
 /* Bumped with each data release so phones never pair new code with cached old data. */
-const DATA_V='40';
+const DATA_V='42';
 FG.DATA_V=DATA_V;
 const getJSON=url=>fetch(`${url}?v=${DATA_V}`).then(r=>{if(!r.ok)throw Error(url);return r.json();});
 FG.pairKey=(a,b)=>a<b?`${a}|${b}`:`${b}|${a}`;
@@ -125,18 +125,35 @@ FG.available=(name,j=store.journey(),lord=FG.lord())=>{
   return paths.some(L=>FG.canJoin(name,L,j));
 };
 const awayText=(n,j,lord)=>j.part===1?(LORDS.includes(n)?`${n}’s path only`:`${n} can’t join on ${lord}’s path`):j.part===2?`${n} isn’t in ${j.warLord||lord}’s army`:`${n} isn’t in your army yet`;
-FG.rankGate=(pr,r,j=store.journey(),lord=FG.lord())=>{
+/* opts.pathOnly: ignore this save file's recruits and chapter (used to compare paths);
+   opts.assume: treat this character as recruited (used to show what recruiting them would open). */
+FG.rankGate=(pr,r,j=store.journey(),lord=FG.lord(),opts={})=>{
   const g=pr.gates?.[r]||{},min=g.minPart??pr.parts?.[r]??1,P=FG.partName;
   const rules=D.supports?.viewing||{};
-  if(j.part<min)return{short:`opens in ${P(min)}`,text:`Opens in ${P(min)}`};
-  if(g.maxPart!=null&&j.part>g.maxPart)return{short:`closed after ${P(g.maxPart)}`,text:`Only viewable up to ${P(g.maxPart)}`};
+  if(j.part<min)return{short:`opens in ${P(min)}`,text:`Opens in ${P(min)}`,part:true};
+  if(g.maxPart!=null&&j.part>g.maxPart)return{short:`closed after ${P(g.maxPart)}`,text:`Only viewable up to ${P(g.maxPart)}`,part:true};
   if(Array.isArray(rules.closedParts)&&rules.closedParts.includes(j.part))return{short:`not during ${P(j.part)}`,text:`Conversations can’t be viewed during ${P(j.part)}`};
   if(g.path&&j.part===1&&lord!==g.path)return{short:`${g.path}’s path only`,text:`Only on ${g.path}’s path`};
   if(g.paths&&j.part===1&&!g.paths.includes(lord)){const t=g.paths.map(l=>`${l}’s`).join(' or ');return{short:`${t} path only`,text:`Only on ${t} path`};}
   if(g.notPath&&j.part===1&&lord===g.notPath)return{short:`not on ${lord}’s path`,text:`Not viewable on ${lord}’s path`};
   if(g.pathComplete&&!j.paths.includes(g.pathComplete))return{short:`after ${g.pathComplete}’s path`,text:`After completing ${g.pathComplete}’s path`};
   if(g.warLord&&j.part>=2&&j.warLord!==g.warLord)return{short:`${g.warLord} leading Part II`,text:`Only with ${g.warLord} leading Part II`};
+  for(const [x,y,r2] of g.after||[])if(!FG.seen(x,y).includes(r2))return{short:`after ${x} & ${y}’s ${r2}`,text:`Watch ${x} & ${y}’s ${r2} conversation first`};
+  for(const [x,y,r2] of g.before||[])if(FG.seen(x,y).includes(r2))return{short:`closed by ${x} & ${y}’s ${r2}`,text:`Closes once ${x} & ${y}’s ${r2} conversation is watched`};
   for(const n of [pr.a,pr.b])if(n&&!FG.available(n,j,lord)){const t=awayText(n,j,lord);return{short:t,text:t,away:n};}
+  /* Part I: chapter windows (when your chapter is set) and recruits — at least one of the two must be recruited,
+     some conversations need both (checked in game). */
+  if(!opts.pathOnly&&j.part===1){
+    const p=store.profile(),ch=p.chapter,first=D.supports?.viewing?.firstChapter||4;
+    if(ch!=null){
+      if(ch<first)return{short:`inns open in Chapter ${first}`,text:`Supports can be viewed from Chapter ${first} — you’re on Chapter ${ch}`};
+      if(g.fromCh&&ch<g.fromCh)return{short:`from Chapter ${g.fromCh}`,text:`Opens in Chapter ${g.fromCh} — you’re on Chapter ${ch}`};
+      if(g.untilCh&&ch>g.untilCh)return{short:`closed after Chapter ${g.untilCh}`,text:`Only until the end of Chapter ${g.untilCh} — you’re on Chapter ${ch}`,missed:true};
+    }
+    const out=[pr.a,pr.b].filter(n=>n!==opts.assume&&!FG.inCompany(n,p));
+    if(g.both&&out.length){const t=`recruit ${out.join(' & ')} first`;return{short:t,text:`Needs both recruited — recruit ${out.join(' and ')} first`,recruit:out};}
+    if(out.length===2)return{short:`recruit ${pr.a} or ${pr.b}`,text:`Recruit ${pr.a} or ${pr.b} first`,recruit:out};
+  }
   return null;
 };
 /* Unwatched conversations this character has with your company that you can actually view on this path now. */
@@ -145,7 +162,7 @@ FG.unseenWithCompany=(name,p=store.profile())=>{
   (D.partners.get(name)||[]).forEach(m=>{
     if(m===name||!FG.inCompany(m,p))return;
     const pr=FG.pair(name,m),seen=FG.seen(name,m);
-    pr.ranks.forEach(r=>{if(!seen.includes(r)&&!FG.rankGate(pr,r))n++;});
+    pr.ranks.forEach(r=>{if(!seen.includes(r)&&!FG.rankGate(pr,r,undefined,undefined,{assume:name}))n++;});
   });
   return n;
 };
@@ -161,7 +178,7 @@ FG.recommendation=(name,p=store.profile())=>{
   /* Supports viewable on this path but on no other Part I path. */
   (D.partners.get(name)||[]).forEach(m=>{
     const pr=FG.pair(name,m),seen=FG.seen(name,m);
-    pr.ranks.forEach(r=>{if(!seen.includes(r)&&!FG.rankGate(pr,r,j,L)&&LORDS.every(O=>O===L||FG.rankGate(pr,r,j,O)))out.exclusive++;});
+    pr.ranks.forEach(r=>{if(!seen.includes(r)&&!FG.rankGate(pr,r,j,L,{pathOnly:true})&&LORDS.every(O=>O===L||FG.rankGate(pr,r,j,O,{pathOnly:true})))out.exclusive++;});
   });
   const here=FG.routeOf(name,L),others=LORDS.filter(O=>O!==L&&FG.canJoin(name,O,j)).map(O=>FG.routeOf(name,O));
   out.only=!others.length;

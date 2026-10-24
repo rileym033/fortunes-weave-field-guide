@@ -120,11 +120,48 @@ function paint({ceremony=false,from=null}={}){
   FG.paintJourneyPills();
 }
 FG.paintJourneyPills=()=>{
-  const j=store.journey(),label=FG.partName(j.part)+(j.part===1&&j.paths.length?` · ${j.paths.length} path${j.paths.length>1?'s':''} done`:'');
-  document.querySelectorAll('[data-journey-pill]').forEach(b=>{const t=b.querySelector('.jp-text');if(!t)return;t.textContent=label;b.setAttribute('aria-label',`Journey: ${label}. Change in More`);b.dataset.part=j.part;});
+  const j=store.journey(),ch=store.profile().chapter;
+  const label=j.part===1?`Part I · ${ch?`Ch. ${ch}`:'set chapter'}`:FG.partName(j.part);
+  document.querySelectorAll('[data-journey-pill]').forEach(b=>{const t=b.querySelector('.jp-text');if(!t)return;t.textContent=label;
+    b.setAttribute('aria-label',j.part===1?`Part I${ch?`, Chapter ${ch}`:''}. Change chapter`:`Journey: ${label}. Change in More`);b.dataset.part=j.part;});
 };
+/* ---------- Chapter (per save file, Part I): the pill opens a small sheet, no trip to More needed ---------- */
+function chapterHTML(){
+  const p=store.profile(),ch=p.chapter;
+  return `<h2 id="chapter-title" class="ch-title">${esc(p.lord)}’s path</h2>`+
+    `<p class="ch-now">${ch?`Chapter <b>${ch}</b>`:'<span>Which chapter are you on?</span>'}</p>`+
+    (ch&&ch<12?`<button type="button" class="goldbtn ch-next" data-ch="${ch+1}"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Finished Chapter ${ch} · on to ${ch+1}</button>`:'')+
+    (ch===12?`<p class="note">On the last chapter. When you finish ${esc(p.lord)}’s path, mark it in <button type="button" class="linkish" data-journey-go>your journey</button>.</p>`:'')+
+    `<div class="ch-grid" role="radiogroup" aria-label="Chapter">${Array.from({length:12},(_,i)=>i+1).map(n=>`<button type="button" role="radio" data-ch="${n}" aria-checked="${n===ch}" tabindex="${n===(ch||1)?0:-1}" class="${ch&&n<ch?'past':''}${n===ch?' on':''}"><b>${n}</b></button>`).join('')}</div>`+
+    `<p class="note">Used for chapter windows on supports (“from Chapter 10”, “before the end of Chapter 8”) and to mark where you are in Missables. Saved in this save file.</p>`+
+    `<div class="ch-foot">${ch?'<button type="button" class="textbutton" data-ch="0">Stop tracking chapters</button>':''}<button type="button" class="textbutton" data-journey-go>Parts &amp; completed paths ›</button></div>`;
+}
+function openChapter(){$('chapter-content').innerHTML=chapterHTML();FG.openSheet($('chapter'));$('chapter-content').querySelector('.ch-next,[aria-checked="true"],[data-ch="1"]')?.focus();}
+$('chapter-content').addEventListener('click',e=>{
+  const b=e.target.closest('[data-ch]');if(!b)return;
+  const n=+b.dataset.ch,prev=store.profile().chapter;
+  store.update(p=>{p.chapter=n||null;});
+  FG.haptic?.(n>(prev||0)?'success':'tick');
+  $('chapter-content').innerHTML=chapterHTML();
+  const again=$('chapter-content').querySelector(n?`.ch-grid [data-ch="${n}"]`:'.ch-grid [data-ch="1"]');again?.focus();
+  if(n&&!calm()){again?.classList.add('stamp-in');}
+  FG.toast(n?`Chapter ${n}`:'Chapter tracking off');
+});
+$('chapter-content').addEventListener('keydown',e=>{
+  const b=e.target.closest('.ch-grid [data-ch]');if(!b)return;
+  const n=+b.dataset.ch,to={ArrowRight:n+1,ArrowDown:n+1,ArrowLeft:n-1,ArrowUp:n-1,Home:1,End:12}[e.key];if(to===undefined)return;
+  e.preventDefault();$('chapter-content').querySelector(`.ch-grid [data-ch="${Math.max(1,Math.min(12,to))}"]`)?.click();
+});
+/* Closing returns focus to the pill you came from — or to the journey heading if you went on to More. */
+FG.wireSheet($('chapter'),$('close-chapter'),()=>{
+  const view=document.querySelector('.view:not([hidden])');
+  (FG.currentTab()==='about'?$('journey-title'):view?.querySelector('[data-journey-pill]'))?.focus({preventScroll:true});
+});
 document.addEventListener('click',e=>{
-  if(!e.target.closest('[data-journey-pill]'))return;
+  const pill=e.target.closest('[data-journey-pill]');
+  if(pill&&store.journey().part===1){openChapter();return;}
+  if(!pill&&!e.target.closest('[data-journey-go]'))return;
+  if($('chapter').open)FG.closeSheet($('chapter'));
   FG.setTab('about');
   const h=$('journey-title');h.tabIndex=-1;h.focus({preventScroll:true});
   requestAnimationFrame(()=>{root.scrollIntoView({block:'start',behavior:calm()?'auto':'smooth'});root.classList.remove('beckon');void root.offsetWidth;root.classList.add('beckon');});

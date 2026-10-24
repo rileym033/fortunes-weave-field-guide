@@ -60,7 +60,8 @@ function normProfile(p){
   return{id:p.id,name:String(p.name||`${p.lord}’s journey`).slice(0,40),lord:p.lord,
     createdAt:+p.createdAt||Date.now(),updatedAt:+p.updatedAt||Date.now(),
     wishlist:strArr(p.wishlist),recruited:strArr(p.recruited),viewed:strArr(p.viewed),
-    supports,meal:{seats},route:LORDS.includes(p.route)?p.route:p.lord};
+    supports,meal:{seats},route:LORDS.includes(p.route)?p.route:p.lord,
+    chapter:Number.isInteger(p.chapter)&&p.chapter>=1&&p.chapter<=12?p.chapter:null};
 }
 function normState(s){
   if(!s||typeof s!=='object'||s.schema!==2||!s.profiles||typeof s.profiles!=='object')return null;
