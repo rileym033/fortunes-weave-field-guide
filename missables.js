@@ -2,11 +2,23 @@
 /* Missables — swipeable lord routes with per-route palettes and checklists.
    Viewed notes and the chosen route live in the active save file. */
 let missables=[],routes=[],routeIndex=0,filterMode='all';
+/* Which Part the Missables tab shows. Part I keeps the per-lord carousel; the other Parts are one timeline. */
+let mPart=null,partINotes='';
+const PART_COPY=[
+  {numeral:'✦',name:'Prologue',sub:j=>'Shared by every path'},
+  {numeral:'I',name:'Part I',sub:j=>''},
+  {numeral:'II',name:'Part II',sub:j=>j.warLord?`Led by ${j.warLord}`:'One lord leads'},
+  {numeral:'III',name:'Part III',sub:j=>'Your whole company'}];
+const isLater=()=>mPart!==null&&mPart!==1;
+const laterKey=e=>JSON.stringify(['later',e.id]);
+const laterViewed=()=>new Set(store.journey().viewed);
 let viewed=new Set(store.profile().viewed);
 let profileId=store.profile().id;
 FG.onProfileChange.push(()=>{
   const p=store.profile(),switched=p.id!==profileId;
   profileId=p.id;viewed=new Set(p.viewed);
+  paintPartTabs();
+  if(isLater()){if(isMissablesVisible())renderMissables({animate:false});return;}
   if(!routes.length)return;
   const i=routes.indexOf(p.route);
   if(i>=0&&i!==routeIndex)selectRoute(i,{scroll:isMissablesVisible(),animate:false,persist:false});
@@ -97,7 +109,7 @@ function selectRoute(index,{scroll=true,animate=true,persist=true}={}){
   });
   $('route-prev').disabled=index===0;$('route-next').disabled=index===routes.length-1;
   list.setAttribute('aria-labelledby',`route-tab-${index}`);
-  if(isMissablesVisible())FG.setTheme(route);
+  if(isMissablesVisible()&&!isLater())FG.setTheme(route);
   if(changed)$('route-status').textContent=`${route}’s route`;
   renderMissables({animate:changed&&animate});
   if(scroll)scrollToIndex(index,animate);
@@ -159,6 +171,9 @@ tabs.addEventListener('keydown',e=>{
 
 FG.onMissablesShown=()=>{
   FG.loadMissables();
+  if(mPart===null)mPart=store.journey().part;
+  paintPartTabs();applyPart({animate:false});
+  if(isLater())return;
   if(routes.length){
     const i=routes.indexOf(store.profile().route);
     if(i>=0&&i!==routeIndex)selectRoute(i,{scroll:false,animate:false,persist:false});
@@ -179,6 +194,7 @@ function rowHTML(e,i){
     `<span class="missable-more" aria-hidden="true"><svg class="ico"><use href="#i-chev-r"/></svg></span></article>`;
 }
 function renderMissables({animate=true}={}){
+  if(isLater())return renderLater({animate});
   const route=currentRoute();if(!route)return;
   const routeRows=routeEntries(route);
   const rows=routeRows.filter(e=>filterMode==='all'||!viewed.has(sceneKey(e)));
@@ -196,6 +212,15 @@ function focusFilter(){$('missables-filter').querySelector('[aria-pressed="true"
 list.addEventListener('change',event=>{
   const input=event.target;if(!input.matches('.missable-check input'))return;
   const row=input.closest('.missable-row');
+  if(isLater()){
+    const e=row&&(FG.data.later||[]).find(x=>x.id===row.dataset.id);if(!e)return;
+    store.setSharedViewed(laterKey(e),input.checked);
+    row.classList.toggle('is-viewed',input.checked);row.classList.remove('just-sealed');
+    if(input.checked&&!reduceMotion()){void row.offsetWidth;row.classList.add('just-sealed');}
+    laterProgress();
+    if(filterMode==='unviewed'&&input.checked){row.classList.add('missable-row-leaving');input.disabled=true;setTimeout(()=>renderMissables({animate:false}),reduceMotion()?0:300);}
+    return;
+  }
   const entry=row&&missables.find(e=>e.route===currentRoute()&&e.id===row.dataset.id);if(!entry)return;
   const key=sceneKey(entry);
   if(input.checked)viewed.add(key);else viewed.delete(key);
@@ -217,8 +242,19 @@ list.addEventListener('change',event=>{
 });
 
 let activeSceneButton=null,activeEntry=null;
+const entryDone=e=>e.part!=null&&e.part!==1?laterViewed().has(laterKey(e)):viewed.has(sceneKey(e));
+const TYPE_LABEL={scene:'Scene',paralogue:'Paralogue',recruit:'Recruitment',item:'Item',quest:'Quest'};
 function sceneDetailHTML(entry){
-  const para=entry.type==='paralogue',done=viewed.has(sceneKey(entry));
+  const para=entry.type==='paralogue',done=entryDone(entry),later=entry.part!=null&&entry.part!==1;
+  if(later){
+    const sources=Array.isArray(entry.sources)?entry.sources.filter(url=>typeof url==='string'&&url.startsWith('https://')):[];
+    return `<div class="md-tags"><span class="md-tag part">${esc(FG.partName(entry.part))}</span>${entry.route&&entry.route!=='All'?`<span class="md-tag route">${esc(entry.route)}</span>`:''}${entry.chapter?`<span class="md-tag">Chapter ${esc(entry.chapter)}</span>`:''}<span class="md-tag${para?' para':''}">${esc(TYPE_LABEL[entry.type]||'Note')}</span></div>`+
+      `<div class="md-hero">${entry.owner&&FG.portrait(entry.owner)?`<span class="p-face"><img src="${esc(FG.portrait(entry.owner))}" alt="${esc(entry.owner)} portrait"></span>`:''}<h2 id="missables-detail-title">${esc(entry.title)}</h2></div>`+
+      (entry.certainty==='uncertain'?'<p class="warning">Uncertain — requirements need confirmation.</p>':'')+
+      `<dl class="facts">${FIELDS.map(f=>`<dt><svg class="ico" aria-hidden="true"><use href="#${FIELD_META[f][1]}"/></svg>${FIELD_META[f][0]}</dt><dd>${esc(entry[f]||'Not verified')}</dd>`).join('')}</dl>`+
+      `<div class="md-actions"><button type="button" id="missables-detail-toggle" class="${done?'ghostbtn':'goldbtn'}" aria-pressed="${done}">${done?'✓ Viewed · tap to undo':'Mark as viewed'}</button></div>`+
+      (sources.length?`<details class="missable-sources"><summary>Sources — unfiltered pages may contain spoilers</summary><ul>${sources.map((url,i)=>`<li><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">Source ${i+1}</a></li>`).join('')}</ul></details>`:'');
+  }
   const sources=Array.isArray(entry.sources)?entry.sources.filter(url=>typeof url==='string'&&url.startsWith('https://')):[];
   return `<div class="md-tags"><span class="md-tag route">${esc(entry.route)}</span><span class="md-tag">Chapter ${esc(entry.chapter)}</span>${para?'<span class="md-tag para">Paralogue</span>':''}</div>`+
     `<div class="md-hero">${para&&entry.portrait?`<span class="p-face"><img src="${esc(entry.portrait)}" alt="${esc(entry.owner)} portrait"></span>`:''}<h2 id="missables-detail-title">${esc(entry.title)}</h2></div>`+
@@ -229,9 +265,9 @@ function sceneDetailHTML(entry){
 }
 function bindDetailToggle(entry){
   $('missables-detail-toggle').onclick=()=>{
-    const key=sceneKey(entry),now=!viewed.has(key);
-    if(now)viewed.add(key);else viewed.delete(key);
-    persistViewed(key,now);
+    const later=entry.part!=null&&entry.part!==1,now=!entryDone(entry);
+    if(later)store.setSharedViewed(laterKey(entry),now);
+    else{const key=sceneKey(entry);if(now)viewed.add(key);else viewed.delete(key);persistViewed(key,now);}
     renderMissables({animate:false});
     const replacement=[...list.querySelectorAll('.missable-row')].find(r=>r.dataset.id===entry.id);
     activeSceneButton=replacement?.querySelector('.missable-title')||null;
@@ -243,13 +279,15 @@ function bindDetailToggle(entry){
 }
 function openSceneDetail(entry,button){
   activeSceneButton=button;activeEntry=entry;
+  document.querySelector('#missables-detail .dialogtop .eyebrow').textContent=`${FG.partName(entry.part??1)} · Requirements`;
   $('missables-detail-content').innerHTML=sceneDetailHTML(entry);
   bindDetailToggle(entry);
   FG.openSheet($('missables-detail'));
 }
 list.addEventListener('click',event=>{
   const button=event.target.closest('.missable-title');if(!button)return;
-  const entry=missables.find(e=>e.route===currentRoute()&&e.id===button.closest('.missable-row').dataset.id);
+  const id=button.closest('.missable-row').dataset.id;
+  const entry=isLater()?(FG.data.later||[]).find(e=>e.id===id):missables.find(e=>e.route===currentRoute()&&e.id===id);
   if(entry)openSceneDetail(entry,button);
 });
 FG.wireSheet($('missables-detail'),$('close-missables'),()=>{(activeSceneButton&&document.contains(activeSceneButton)?activeSceneButton:focusFilter())?.focus?.({preventScroll:true});});
@@ -259,6 +297,97 @@ $('missables-filter').addEventListener('click',e=>{
   filterMode=b.dataset.filter;
   $('missables-filter').querySelectorAll('[data-filter]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
   renderMissables();
+});
+
+/* ---------- Parts: Prologue, Part II and Part III ---------- */
+const partTabs=$('part-tabs');
+function paintPartTabs(){
+  const j=store.journey();
+  if(!partTabs.childElementCount)partTabs.innerHTML=PART_COPY.map((c,n)=>`<button type="button" role="tab" class="part-tab" id="part-tab-${n}" data-mpart="${n}" aria-selected="false" aria-controls="missables-list"><b>${c.numeral}</b><span>${c.name}</span><svg class="ico" aria-hidden="true"><use href="#i-lock"/></svg></button>`).join('');
+  [...partTabs.children].forEach(t=>{
+    const n=+t.dataset.mpart,sealed=n>j.part;
+    t.classList.toggle('sealed',sealed);t.querySelector('.ico').style.display=sealed?'':'none';
+    t.setAttribute('aria-selected',String(n===mPart));t.tabIndex=n===mPart?0:-1;
+    t.setAttribute('aria-label',`${PART_COPY[n].name}${sealed?', sealed until you reach it':''}`);
+    t.setAttribute('aria-controls',sealed?'sealed-card':'missables-list');
+  });
+}
+function applyPart({animate=true}={}){
+  const later=isLater(),j=store.journey(),view=$('missables-view');
+  view.classList.toggle('later-part',later);
+  const stage=$('part-stage');stage.hidden=!later;
+  $('missables-eyebrow').textContent=later?`${PART_COPY[mPart].name} · Missable notes`:'Part I · Scenes & Paralogues';
+  $('missables-footnote').textContent=later?'Check off viewed notes · Shared by every save file — after Part I the game is one timeline.':'Check off viewed notes · Saved automatically in this save file, separately for each route.';
+  if(later){
+    const c=PART_COPY[mPart];
+    stage.style.setProperty('--pg',['#9fd8cf','#f0c76a','#ff7a5c','#a9b8ff'][mPart]);
+    const art=mPart===2&&j.warLord&&ART[j.warLord]?`<img class="ps-art" src="${ART[j.warLord].src}" alt="" style="object-position:${ART[j.warLord].pos}" decoding="async">`:'';
+    stage.innerHTML=`${art}<div class="motes" aria-hidden="true"></div><span class="ps-numeral" aria-hidden="true">${c.numeral}</span><span class="ps-name">${c.name}</span>${c.sub(j)?`<p class="ps-sub">${esc(c.sub(j))}</p>`:''}`;
+    FG.seedMotes(stage.querySelector('.motes'),8);
+    if(isMissablesVisible())FG.setTheme(mPart>=2&&j.warLord?j.warLord:FG.lord());
+    FG.loadLater().then(()=>{if(isLater())renderLater({animate});});
+  }else{
+    $('sealed-card').hidden=true;list.hidden=false;filterButtons.forEach(b=>{b.disabled=!routes.length;});
+    $('missables-coverage').textContent=partINotes;
+    if(isMissablesVisible()&&currentRoute())FG.setTheme(currentRoute());
+    if(routes.length){renderMissables({animate});requestAnimationFrame(()=>{scrollToIndex(routeIndex,false);paintParallax();});}
+  }
+}
+function laterRows(){
+  const j=store.journey();
+  /* Chapter order, then the order the notes are written in (sources list them in play order). */
+  const all=FG.data.later||[];
+  return all.filter(e=>e.part===mPart&&FG.laterVisible(e,j)).sort((a,b)=>(+a.chapterOrder||0)-(+b.chapterOrder||0)||all.indexOf(a)-all.indexOf(b));
+}
+function laterProgress(){
+  const rows=laterRows(),seen=laterViewed(),done=rows.filter(e=>seen.has(laterKey(e))).length;
+  $('missables-progress').textContent=rows.length?`${done} of ${rows.length} viewed`:'';
+  $('missables-bar-fill').style.setProperty('--p',(rows.length?done/rows.length*100:0)+'%');
+}
+function renderLater({animate=true}={}){
+  const j=store.journey(),sealed=mPart>j.part,card=$('sealed-card');
+  card.hidden=!sealed;list.hidden=sealed;$('part-stage').hidden=sealed;
+  list.setAttribute('aria-labelledby',`part-tab-${mPart}`);
+  filterButtons.forEach(b=>{b.disabled=sealed;});
+  if(sealed){
+    $('sealed-title').textContent=`Sealed until ${PART_COPY[mPart].name}`;
+    $('sealed-text').textContent=`Your journey is at ${FG.partName(j.part)}. When you get there, update it in More — nothing here hints at what’s ahead.`;
+    $('missables-progress').textContent='';$('missables-bar-fill').style.setProperty('--p','0%');$('missables-empty').hidden=true;
+    $('missables-coverage').textContent='';
+    FG.paintJourneyPills?.();return;
+  }
+  const all=laterRows(),seen=laterViewed();
+  $('missables-coverage').textContent=(FG.data.laterNotes?.[String(mPart)]||[]).join(' ');
+  const rows=all.filter(e=>filterMode==='all'||!seen.has(laterKey(e)));
+  laterProgress();
+  $('missables-empty').hidden=rows.length>0;
+  $('missables-empty').textContent=all.length?'All listed notes viewed.':'No verified notes for this Part yet. This does not confirm there are none.';
+  const groups=[];
+  rows.forEach(e=>{const g=groups[groups.length-1],ch=e.chapter||'—';if(g&&g.chapter===ch)g.rows.push(e);else groups.push({chapter:ch,rows:[e]});});
+  let i=0;
+  list.classList.toggle('no-anim',!animate);
+  list.innerHTML=groups.map(g=>`<section class="chapter-group" aria-label="Chapter ${esc(g.chapter)}"><h2 class="chapter-head"><span>Chapter</span><b class="chapter-num">${esc(g.chapter)}</b><small>${g.rows.length} ${g.rows.length===1?'note':'notes'}</small></h2>${g.rows.map(e=>{
+    const done=seen.has(laterKey(e)),para=e.type==='paralogue',face=e.owner&&FG.revealed(e.owner)?FG.portrait(e.owner):'';
+    return `<article class="missable-row${para?' paralogue':''}${done?' is-viewed':''}" data-id="${esc(e.id)}" style="--i:${i++}">`+
+      `<label class="missable-check"><input type="checkbox" aria-label="Viewed: ${esc(e.title)}"${done?' checked':''}><span class="seal" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span></label>`+
+      `<button class="missable-title">${face?`<span class="p-face"><img src="${esc(face)}" alt="${esc(e.owner)} portrait" width="40" height="46"></span>`:''}`+
+      `<span><span class="t-text">${esc(e.title)}</span><small>${esc([TYPE_LABEL[e.type]||'',e.route&&e.route!=='All'?e.route:''].filter(Boolean).join(' · '))}</small></span></button>`+
+      `<span class="missable-more" aria-hidden="true"><svg class="ico"><use href="#i-chev-r"/></svg></span></article>`;}).join('')}</section>`).join('');
+}
+partTabs.addEventListener('click',e=>{
+  const t=e.target.closest('[data-mpart]');if(!t)return;
+  const n=+t.dataset.mpart;if(n===mPart)return;
+  mPart=n;filterMode='all';$('missables-filter').querySelectorAll('[data-filter]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.filter==='all')));
+  paintPartTabs();applyPart();FG.haptic?.();
+  if(n>store.journey().part&&!reduceMotion()){const c=$('sealed-card');c.classList.remove('shake');void c.offsetWidth;c.classList.add('shake');}
+});
+partTabs.addEventListener('keydown',e=>{
+  const keys={ArrowRight:mPart+1,ArrowLeft:mPart-1,Home:0,End:3};if(!(e.key in keys))return;e.preventDefault();
+  const n=Math.max(0,Math.min(3,keys[e.key]));partTabs.children[n].click();partTabs.children[n].focus();
+});
+store.on('change',e=>{
+  if(activeEntry&&activeEntry.part!=null&&activeEntry.part!==1&&!FG.laterVisible(activeEntry)){FG.closeSheet($('missables-detail'));$('missables-detail-content').innerHTML='';activeEntry=null;}
+  if(e?.source==='journey'||e?.source==='tab'){paintPartTabs();if(isMissablesVisible()&&isLater())applyPart({animate:false});}
 });
 
 /* ---------- Load ---------- */
@@ -279,7 +408,7 @@ FG.loadMissables=()=>{
   routeIndex=-1;
   selectRoute(start,{scroll:false,animate:false,persist:false});
   if(isMissablesVisible())FG.onMissablesShown();
-  $('missables-coverage').textContent=d.coverageNotes.join(' ');
+  partINotes=d.coverageNotes.join(' ');if(!isLater())$('missables-coverage').textContent=partINotes;
   filterButtons.forEach(b=>{b.disabled=false;});
 }).catch(()=>{$('missables-load-error').hidden=false;$('missables-progress').textContent='Notes unavailable';});
 };
