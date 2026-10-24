@@ -322,3 +322,27 @@ body.bulk-open .toast{bottom:calc(env(safe-area-inset-bottom) + 86px + var(--bul
 .type-chip[aria-pressed="true"] .tc-mark::before{background:var(--gold-grad);border-color:#fff1c4}
 .type-chip[aria-pressed="true"] .tc-mark .ico{opacity:1}
 .missables-view.later-part .type-chips{display:none}
+.type-chip.complete b{background:var(--gold-grad);color:#2c1b05}
+
+/* ================= v3.2: chapter sheet, "you're here" ================= */
+.ch-title{margin:0;font:600 26px/1.1 var(--display);color:var(--ivory)}
+.ch-now{margin:6px 0 14px;font:600 18px/1.2 var(--display);color:var(--muted)}
+.ch-now b{font:700 34px/1 var(--caps);color:var(--gold-hi);margin-left:4px;vertical-align:-3px}
+.ch-next{width:100%;margin-bottom:14px}
+.ch-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin:0 -4px 10px}
+.ch-grid button{position:relative;display:grid;place-items:center;height:52px;border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.ch-grid button::before{content:"";position:absolute;width:30px;height:30px;transform:rotate(45deg);border-radius:6px;border:1.5px solid rgba(226,194,122,.4);background:rgba(4,14,15,.6);transition:background .3s,border-color .3s,box-shadow .3s,transform .35s var(--spring)}
+.ch-grid button b{position:relative;font:700 14px/1 var(--caps);color:var(--muted)}
+.ch-grid button.past::before{background:rgba(226,194,122,.18);border-color:rgba(226,194,122,.6)}
+.ch-grid button.past b{color:var(--gold)}
+.ch-grid button.on::before{background:var(--gold-grad);border-color:#fff1c4;box-shadow:0 0 16px rgba(255,214,140,.7);transform:rotate(45deg) scale(1.12)}
+.ch-grid button.on b{color:#2c1b05}
+.ch-grid button:focus-visible{outline:none}
+.ch-grid button:focus-visible::before{outline:2px solid var(--gold-hi);outline-offset:3px}
+.ch-grid button.stamp-in::before{animation:arrive .7s var(--spring)}
+.ch-foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px;margin-top:6px}
+.ch-foot .textbutton{min-height:44px}
+.linkish{border:0;background:none;padding:0;color:var(--gold-hi);font:inherit;text-decoration:underline;cursor:pointer}
+.chapter-group.is-here .chapter-head{color:var(--gold-hi)}
+.here-tag{display:inline-flex;align-items:center;gap:5px;margin-left:8px;padding:3px 9px;border-radius:999px;background:var(--gold-grad);color:#2c1b05;font:700 10.5px/1.2 var(--caps);letter-spacing:.08em;text-transform:uppercase;box-shadow:0 0 12px -2px rgba(255,214,140,.7)}
+@media (prefers-reduced-motion:reduce){.ch-grid button.stamp-in::before{animation:none}}

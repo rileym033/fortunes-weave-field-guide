@@ -13,11 +13,11 @@
 <title>Field Guide · Fortune’s Weave</title>
 <link rel="preload" href="fonts/cinzel-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/cormorant-garamond-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=40">
-<link rel="stylesheet" href="missables.css?v=40">
-<link rel="stylesheet" href="v2.css?v=40">
-<link rel="stylesheet" href="fx.css?v=40">
-<link rel="stylesheet" href="v3.css?v=40">
+<link rel="stylesheet" href="style.css?v=42">
+<link rel="stylesheet" href="missables.css?v=42">
+<link rel="stylesheet" href="v2.css?v=42">
+<link rel="stylesheet" href="fx.css?v=42">
+<link rel="stylesheet" href="v3.css?v=42">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -222,7 +222,7 @@
   <p class="note hint"><svg class="ico" aria-hidden="true"><use href="#i-spark"/></svg>Tap a title for requirements, not story summaries. Only scenes count towards progress.</p>
   <p id="missables-storage-warning" class="warning" role="status" hidden>Checklist storage is unavailable or unreadable. Marks work for this visit but may not be saved.</p>
   <p id="missables-load-error" class="warning" role="status" hidden>Missables notes are not available. Verified data may not be published yet, or the connection failed. No checklist has been inferred. Reload to try again.</p>
-  <div id="sealed-card" class="sealed-card" role="tabpanel" hidden><span class="seal-gem" aria-hidden="true"><svg class="ico"><use href="#i-lock"/></svg></span><h2 id="sealed-title">Sealed</h2><p id="sealed-text"></p><button type="button" class="goldbtn" data-journey-pill>Update my journey</button></div>
+  <div id="sealed-card" class="sealed-card" role="tabpanel" hidden><span class="seal-gem" aria-hidden="true"><svg class="ico"><use href="#i-lock"/></svg></span><h2 id="sealed-title">Sealed</h2><p id="sealed-text"></p><button type="button" class="goldbtn" data-journey-go>Update my journey</button></div>
   <div id="missables-list" role="tabpanel" aria-labelledby="missables-heading"></div>
   <p id="missables-empty" class="empty" hidden></p>
   <p class="note" id="missables-footnote">Check off viewed notes · Saved automatically in this save file, separately for each route.</p>
@@ -321,6 +321,11 @@
   <div class="dialogtop"><span class="eyebrow">Support conversation</span><button id="close-pair" class="closebtn" aria-label="Close support details"><svg class="ico" aria-hidden="true"><use href="#i-close"/></svg></button></div>
   <div id="pair-content"></div>
 </dialog>
+<dialog id="chapter" class="sheet" aria-labelledby="chapter-title">
+  <div class="sheet-grip" aria-hidden="true"><i></i></div>
+  <div class="dialogtop"><span class="eyebrow">Where you are</span><button id="close-chapter" class="closebtn" aria-label="Close chapter"><svg class="ico" aria-hidden="true"><use href="#i-close"/></svg></button></div>
+  <div id="chapter-content"></div>
+</dialog>
 <dialog id="levels" class="sheet tall" aria-labelledby="levels-title">
   <div class="sheet-grip" aria-hidden="true"><i></i></div>
   <div class="dialogtop"><span class="eyebrow">Support levels</span><button id="close-levels" class="closebtn" aria-label="Close support levels"><svg class="ico" aria-hidden="true"><use href="#i-close"/></svg></button></div>
@@ -343,12 +348,12 @@
     <div class="lord-pick" id="new-file-lords"></div>
   </div>
 </dialog>
-<script src="store.js?v=40"></script>
-<script src="fx.js?v=40" defer></script>
-<script src="app.js?v=40" defer></script>
-<script src="journey.js?v=40" defer></script>
-<script src="supports.js?v=40" defer></script>
-<script src="meals.js?v=40" defer></script>
-<script src="missables.js?v=40" defer></script>
+<script src="store.js?v=42"></script>
+<script src="fx.js?v=42" defer></script>
+<script src="app.js?v=42" defer></script>
+<script src="journey.js?v=42" defer></script>
+<script src="supports.js?v=42" defer></script>
+<script src="meals.js?v=42" defer></script>
+<script src="missables.js?v=42" defer></script>
 </body>
 </html>

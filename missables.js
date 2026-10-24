@@ -99,6 +99,7 @@ function updateProgress(){
   const {done,total}=routeStats(route);
   $('missables-progress').textContent=`${done} of ${total} scenes viewed`;
   $('missables-bar-fill').style.setProperty('--p',(total?done/total*100:0)+'%');
+  if(!isLater())paintTypeChips(routeEntries(route));
 }
 
 /* Parallax: art drifts slower than the swipe, copy fades by distance. */
@@ -230,7 +231,8 @@ function renderMissables({animate=true}={}){
   rows.forEach(e=>{const g=groups[groups.length-1];if(g&&g.chapter===e.chapter)g.rows.push(e);else groups.push({chapter:e.chapter,rows:[e]});});
   let i=0;
   list.classList.toggle('no-anim',!animate);
-  list.innerHTML=groups.map(g=>`<section class="chapter-group" aria-label="Chapter ${esc(g.chapter)}"><h2 class="chapter-head"><span>Chapter</span><b class="chapter-num">${esc(g.chapter)}</b><small>${g.rows.length} ${g.rows.length===1?'note':'notes'}</small></h2>${g.rows.map(e=>rowHTML(e,i++)).join('')}</section>`).join('');
+  const here=String(store.profile().chapter||'');
+  list.innerHTML=groups.map(g=>`<section class="chapter-group${String(g.chapter)===here?' is-here':''}" aria-label="Chapter ${esc(g.chapter)}${String(g.chapter)===here?', you are here':''}"><h2 class="chapter-head"><span>Chapter</span><b class="chapter-num">${esc(g.chapter)}</b>${String(g.chapter)===here?'<span class="here-tag">You’re here</span>':''}<small>${g.rows.length} ${g.rows.length===1?'note':'notes'}</small></h2>${g.rows.map(e=>rowHTML(e,i++)).join('')}</section>`).join('');
 }
 function focusFilter(){$('missables-filter').querySelector('[aria-pressed="true"]')?.focus();}
 
@@ -334,10 +336,11 @@ function paintTypeChips(rows){
   const box=$('type-chips');if(!box)return;
   if(!box.childElementCount)box.innerHTML=TYPE_CHIPS.map(([k,l])=>`<button type="button" class="type-chip" data-type="${k}" aria-pressed="true"><span class="tc-mark" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span>${l}<b></b></button>`).join('');
   box.querySelectorAll('[data-type]').forEach(b=>{
-    const k=b.dataset.type,n=rows.filter(e=>e.type===k).length,left=rows.filter(e=>e.type===k&&!viewed.has(sceneKey(e))).length;
+    const k=b.dataset.type,n=rows.filter(e=>e.type===k).length,done=rows.filter(e=>e.type===k&&viewed.has(sceneKey(e))).length;
     b.setAttribute('aria-pressed',String(showTypes.has(k)));b.hidden=!n;
-    b.querySelector('b').textContent=left===n?n:`${left}/${n}`;
-    b.setAttribute('aria-label',`${TYPE_CHIPS.find(t=>t[0]===k)[1]}: ${left} of ${n} not done${showTypes.has(k)?', shown':', hidden'}`);
+    b.querySelector('b').textContent=`${done}/${n}`;
+    b.classList.toggle('complete',!!n&&done===n);
+    b.setAttribute('aria-label',`${TYPE_CHIPS.find(t=>t[0]===k)[1]}: ${done} of ${n} done${showTypes.has(k)?', shown':', hidden'}`);
   });
 }
 $('type-chips')?.addEventListener('click',e=>{
