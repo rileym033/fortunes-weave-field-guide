@@ -326,3 +326,7 @@ input.rename{width:100%;min-height:40px;padding:0 10px;border-radius:10px;border
 .steps li.step-base{color:var(--muted)}
 .steps li.step-base b{color:var(--ivory);font:700 17px/1 var(--display)}
 #supports-toolbar{row-gap:4px}
+
+/* Rank columns stay aligned: missing ranks hold their slot invisibly. */
+.pip-gap{flex:none;width:44px;height:44px}
+.pips i.gap{visibility:hidden}

@@ -269,7 +269,7 @@ let missablesRequested=false;
 FG.loadMissables=()=>{
  if(missablesRequested)return;
  missablesRequested=true;
- fetch('./missables.json').then(r=>{if(!r.ok)throw Error('Notes unavailable');return r.json();}).then(d=>{
+ fetch(`./missables.json?v=${FG.DATA_V||'1'}`).then(r=>{if(!r.ok)throw Error('Notes unavailable');return r.json();}).then(d=>{
   if(!Array.isArray(d.routes)||!Array.isArray(d.entries)||!Array.isArray(d.coverageNotes)||!d.entries.every(e=>e&&typeof e.id==='string'&&typeof e.route==='string'&&typeof e.title==='string'&&typeof e.chapter==='string'&&Number.isFinite(e.chapterOrder)&&['scene','paralogue'].includes(e.type)))throw Error('Invalid notes');
   missables=d.entries;
   routes=d.routes.filter(r=>typeof r==='string');

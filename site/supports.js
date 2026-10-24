@@ -4,7 +4,7 @@
 const store=FG.store,D=FG.data;
 let focus=null,mode='next',companyOnly=false,part1Only=false,pairA=null,pairB=null,pairReturn=null,castBuilt=false;
 const lvlFor=r=>FG.RANK_LEVEL[r];
-const levelOf=(a,b)=>store.profile().supports[FG.pairKey(a,b)]?.level??null;
+const levelOf=(a,b)=>store.supports()[FG.pairKey(a,b)]?.level??null;
 const calm=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
 /* Per-rank requirement text, falling back to the pair-wide hint for the next rank. */
 const reqFor=(pr,r)=>pr.reqs?.[r]||null;
@@ -15,21 +15,21 @@ const LATER=r=>r&&r>1;
 function setSeen(a,b,rank,on){
   const pr=FG.pair(a,b);if(!pr)return[];
   const idx=pr.ranks.indexOf(rank),before=new Set(FG.seen(a,b));
-  store.update(p=>{
-    const key=FG.pairKey(a,b),cur=p.supports[key]||{seen:[],level:null};
+  store.updateSupports(sup=>{
+    const key=FG.pairKey(a,b),cur=sup[key]||{seen:[],level:null};
     const seen=new Set(cur.seen);
     // Watching a rank implies the earlier ones; un-watching clears the later ones.
     pr.ranks.forEach((r,i)=>{if(on&&i<=idx)seen.add(r);if(!on&&i>=idx)seen.delete(r);});
-    cur.seen=pr.ranks.filter(r=>seen.has(r));
-    if(cur.seen.length||cur.level!==null)p.supports[key]=cur;else delete p.supports[key];
+    cur.seen=['C','B','A'].filter(r=>seen.has(r));
+    if(cur.seen.length||cur.level!==null)sup[key]=cur;else delete sup[key];
   });
   return on?pr.ranks.filter((r,i)=>i<=idx&&!before.has(r)):[];
 }
 function setLevel(a,b,level){
-  store.update(p=>{
-    const key=FG.pairKey(a,b),cur=p.supports[key]||{seen:[],level:null};
+  store.updateSupports(sup=>{
+    const key=FG.pairKey(a,b),cur=sup[key]||{seen:[],level:null};
     cur.level=level;
-    if(cur.seen.length||cur.level!==null)p.supports[key]=cur;else delete p.supports[key];
+    if(cur.seen.length||cur.level!==null)sup[key]=cur;else delete sup[key];
   });
 }
 FG.setSupportSeen=setSeen;
@@ -45,7 +45,8 @@ function statusLine(a,b){
 }
 function pipsHTML(a,b){
   const pr=FG.pair(a,b),s=FG.seen(a,b);
-  return `<div class="pips-row" role="group" aria-label="Conversations between ${esc(a)} and ${esc(b)}">${pr.ranks.map(r=>`<button type="button" class="pip r-${r}${confOf(pr,r)==='unconfirmed'?' unconfirmed':''}" data-rank="${r}" aria-pressed="${s.includes(r)}" aria-label="${r} conversation${s.includes(r)?', viewed':''}${confOf(pr,r)==='unconfirmed'?', unconfirmed':''}"><span><em>${r}</em></span></button>`).join('')}</div>`;
+  /* Fixed C · B · A columns: a rank the pair doesn't have leaves an empty slot, so ranks line up row to row. */
+  return `<div class="pips-row" role="group" aria-label="Conversations between ${esc(a)} and ${esc(b)}">${['C','B','A'].map(r=>!pr.ranks.includes(r)?`<span class="pip-gap" data-gap="${r}" aria-hidden="true"></span>`:`<button type="button" class="pip r-${r}${confOf(pr,r)==='unconfirmed'?' unconfirmed':''}" data-rank="${r}" aria-pressed="${s.includes(r)}" aria-label="${r} conversation${s.includes(r)?', viewed':''}${confOf(pr,r)==='unconfirmed'?', unconfirmed':''}"><span><em>${r}</em></span></button>`).join('')}</div>`;
 }
 function rows(){
   if(!focus)return[];
