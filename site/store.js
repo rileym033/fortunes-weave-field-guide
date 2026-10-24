@@ -8,7 +8,9 @@
    Support conversations are shared by every save file (they carry across routes in the game too);
    a copy is also written into each profile so older versions of the guide never lose them.
    The journey (which Part you're in, which Part I paths are complete) is one timeline shared by every
-   save file — the files only split for the four Part I paths. */
+   save file — the files only split for the four Part I paths.
+   Missable notes marked as viewed are shared the same way as supports (one game, one set of marks);
+   each profile still gets a copy so older versions of the guide keep them. */
 (function(){
 const FG=window.FG=window.FG||{};
 const KEY='fwfg-save-v2';
@@ -66,8 +68,9 @@ function normState(s){
   for(const p of Object.values(s.profiles)){const n=normProfile(p);if(n)profiles[n.id]=n;}
   const ids=Object.keys(profiles);if(!ids.length)return null;
   const supports=mergeSupports(normSupports(s.supports),...Object.values(profiles).map(p=>p.supports));
-  for(const p of Object.values(profiles))delete p.supports;
-  return{schema:2,savedAt:+s.savedAt||0,activeId:profiles[s.activeId]?s.activeId:ids[0],profiles,supports,
+  const viewed=[...new Set([...strArr(s.viewed),...Object.values(profiles).flatMap(p=>p.viewed)])];
+  for(const p of Object.values(profiles)){delete p.supports;delete p.viewed;}
+  return{schema:2,savedAt:+s.savedAt||0,activeId:profiles[s.activeId]?s.activeId:ids[0],profiles,supports,viewed,
     journey:normJourney(s.journey),migratedV1:!!s.migratedV1,ops:strArr(s.ops).slice(-OP_MEMORY)};
 }
 const parse=text=>{try{return normState(JSON.parse(text));}catch{return null;}};
@@ -127,7 +130,8 @@ if(state)keepJourney(state,journeyBackup());
 if(!state){
   const p=fromV1();
   delete p.supports;
-  state={schema:2,savedAt:0,activeId:p.id,profiles:{[p.id]:p},supports:{},journey:normJourney(null),migratedV1:true,ops:[]};
+  const viewed=p.viewed;delete p.viewed;
+  state={schema:2,savedAt:0,activeId:p.id,profiles:{[p.id]:p},supports:{},viewed,journey:normJourney(null),migratedV1:true,ops:[]};
 }
 let activeId=state.activeId;               // per-tab: another tab switching files doesn't yank this one
 let idbOK=null,persisted=null,lastSaved=state.savedAt||0,dirtyIdb=0,idbPending=false;
@@ -135,7 +139,7 @@ const myOps=[];                            // {id,at,apply}
 
 function serialize(){
   const profiles={};
-  for(const [id,p] of Object.entries(state.profiles))profiles[id]={...p,supports:state.supports};
+  for(const [id,p] of Object.entries(state.profiles))profiles[id]={...p,supports:state.supports,viewed:state.viewed};
   return JSON.stringify({...state,activeId,profiles});
 }
 function save(){
@@ -227,13 +231,16 @@ const store={
   /* Shared support progress (all save files). */
   supports(){return state.supports;},
   updateSupports(fn,{quiet=false}={}){commit(st=>{fn(st.supports);},'local',quiet);},
+  /* Shared Part I missable marks (all save files). */
+  viewed(){return state.viewed;},
+  setViewed(key,on){commit(st=>{const s=new Set(st.viewed);if(on)s.add(key);else s.delete(key);st.viewed=[...s];},'local',true);},
   /* Shared journey (all save files). */
   journey(){return state.journey;},
   updateJourney(fn,{quiet=false}={}){commit(st=>{fn(st.journey);st.journey.set=true;},'journey',quiet);},
   /* Prologue / Part II / Part III notes are one timeline, so their marks are shared too. */
   setSharedViewed(key,on){commit(st=>{const s=new Set(st.journey.viewed);if(on)s.add(key);else s.delete(key);st.journey.viewed=[...s];},'local',true);},
   create(lord,name,recruited=[]){
-    const p=newProfile(lord,name,recruited);delete p.supports;
+    const p=newProfile(lord,name,recruited);delete p.supports;delete p.viewed;
     commit(st=>{if(!st.profiles[p.id])st.profiles[p.id]=JSON.parse(JSON.stringify(p));},'switch',true);
     activeId=p.id;state.activeId=p.id;save();emit('change',{source:'switch'});return p;
   },
@@ -250,17 +257,18 @@ const store={
   importCode(code){
     const c=String(code).replace(/\s+/g,'');
     const m2=c.match(/^TFG2\.([A-Za-z0-9+/=]{8,4000000})$/),m1=c.match(/^TFG1\.([A-Za-z0-9+/=]{8,400000})$/);
-    let incoming=[],incomingState=null;
+    let incoming=[],incomingState=null,incomingViewed=[];
     if(m2){const s=normState(JSON.parse(decodeURIComponent(escape(atob(m2[1])))));if(!s)throw Error('shape');incoming=Object.values(s.profiles);incomingState=s;}
     else if(m1){
       const p=JSON.parse(decodeURIComponent(escape(atob(m1[1]))));
       if(!p||p.app!=='theodora-field-guide'||p.v!==1)throw Error('shape');
-      const n=newProfile('Theodora','Imported journey');delete n.supports;n.wishlist=strArr(p.wishlist);n.recruited=strArr(p.recruited);n.viewed=strArr(p.viewed);incoming=[n];
+      const n=newProfile('Theodora','Imported journey');delete n.supports;n.wishlist=strArr(p.wishlist);n.recruited=strArr(p.recruited);incoming=[n];incomingViewed=strArr(p.viewed);
     }else throw Error('format');
     const incomingSupports=incomingState?incomingState.supports:{};
     commit(st=>{
       for(const p of incoming){const ex=st.profiles[p.id];if(ex&&ex.updatedAt>=p.updatedAt)continue;st.profiles[p.id]=JSON.parse(JSON.stringify(p));}
       st.supports=mergeSupports(st.supports,incomingSupports);
+      st.viewed=[...new Set([...st.viewed,...(incomingState?incomingState.viewed:incomingViewed)])];
       /* A device that never set its journey adopts the imported one. */
       if(incomingState?.journey?.set&&!st.journey.set)st.journey=JSON.parse(JSON.stringify(incomingState.journey));
     },'switch',true);

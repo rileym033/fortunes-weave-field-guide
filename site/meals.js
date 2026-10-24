@@ -5,7 +5,8 @@ const store=FG.store,D=FG.data;
 const SEAT_POS=[{x:150,y:44},{x:52,y:196},{x:248,y:196}];
 const PREF_SCORE={love:2,like:1,neutral:0,dislike:-2};
 const PREF_ICON={love:'♥',like:'✓',neutral:'–',dislike:'✕'};
-let prefsWishlist=false,hideNo=false,prevSeats=null,prevPairs=new Set(),wasFull=false;
+const MP=FG.prefs.get('meals')||{};
+let prefsWishlist=!!MP.wishlist,hideNo=!!MP.company,prevSeats=null,prevPairs=new Set(),wasFull=false;
 
 /* A seated guest the journey hasn't revealed yet shows as an empty seat; the saved name is kept for later. */
 const rawSeats=()=>store.profile().meal.seats.slice();
@@ -158,8 +159,10 @@ $('rec-list').addEventListener('click',e=>{
 });
 $('meal-pairs').addEventListener('click',e=>{const b=e.target.closest('[data-pa]');if(!b||!FG.pair(b.dataset.pa,b.dataset.pb))return;const pa=b.dataset.pa,pb=b.dataset.pb;
   FG.openPair(pa,pb,()=>[...$('meal-pairs').querySelectorAll('[data-pa]')].find(x=>x.dataset.pa===pa&&x.dataset.pb===pb));});
-$('rec-wishlist').addEventListener('change',e=>{prefsWishlist=e.target.checked;renderRecs();});
-$('rec-company').addEventListener('change',e=>{hideNo=e.target.checked;renderRecs();});
+const saveMp=()=>FG.prefs.set('meals',{wishlist:prefsWishlist,company:hideNo});
+$('rec-wishlist').checked=prefsWishlist;$('rec-company').checked=hideNo;
+$('rec-wishlist').addEventListener('change',e=>{prefsWishlist=e.target.checked;saveMp();renderRecs();});
+$('rec-company').addEventListener('change',e=>{hideNo=e.target.checked;saveMp();renderRecs();});
 
 FG.onMealsShown=()=>{FG.ready.then(()=>{render();FG.loadMeals().then(()=>{if(FG.currentTab()==='meals')render();});});};
 /* Redraw even while hidden, so nothing the journey has re-sealed lingers in the page. */

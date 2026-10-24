@@ -9,6 +9,9 @@ const LORDS=store.LORDS;
 const RANKS=['C','B','A'];
 const RANK_LEVEL={C:2,B:3,A:4};
 FG.onProfileChange=[];
+/* Filter and view preferences stay on this device (not in the save files). */
+FG.prefs=(()=>{const K='fwfg-ui-v3';let o={};try{o=JSON.parse(localStorage.getItem(K)||'{}')||{};}catch{}
+  return{get:k=>o[k],set:(k,v)=>{o[k]=v;try{localStorage.setItem(K,JSON.stringify(o));}catch{}}};})();
 FG.onDataReady=[];
 
 /* ---------- Theme ---------- */
@@ -80,7 +83,7 @@ FG.wireSheet=(dialog,closeButton,onClose)=>{
 /* ---------- Data ---------- */
 const D=FG.data={roster:null,supports:null,meals:null,byName:new Map(),pairs:new Map(),partners:new Map()};
 /* Bumped with each data release so phones never pair new code with cached old data. */
-const DATA_V='37';
+const DATA_V='40';
 FG.DATA_V=DATA_V;
 const getJSON=url=>fetch(`${url}?v=${DATA_V}`).then(r=>{if(!r.ok)throw Error(url);return r.json();});
 FG.pairKey=(a,b)=>a<b?`${a}|${b}`:`${b}|${a}`;
@@ -90,9 +93,9 @@ FG.isLord=name=>LORDS.includes(name);
 FG.lord=()=>store.profile().lord;
 FG.team=(lord=FG.lord())=>D.roster?.teams?.[lord]||[];
 /* A later-story character's recruitment stays sealed until the journey reaches the Part where they can join. */
-const sealedRecruit=c=>c?.recruitPart!=null&&store.journey().part<c.recruitPart;
+const sealedRecruit=(c,j=store.journey())=>c?.recruitPart!=null&&j.part<c.recruitPart;
 const SEALED_RT={status:'Sealed',sealed:true,support:null,renown:null,materials:'—',gold:'—',steps:[],find:null,window:'Sealed until later in your journey'};
-FG.routeOf=(name,lord=FG.lord())=>{const c=D.byName.get(name),rt=c?.routes?.[lord]||null;return rt&&sealedRecruit(c)?SEALED_RT:rt;};
+FG.routeOf=(name,lord=FG.lord(),j=store.journey())=>{const c=D.byName.get(name),rt=c?.routes?.[lord]||null;return rt&&sealedRecruit(c,j)?SEALED_RT:rt;};
 /* ---------- Journey gates (shared by every save file) ---------- */
 const ROMAN_PART=['Prologue','Part I','Part II','Part III'];
 FG.partName=n=>ROMAN_PART[n]||`Part ${n}`;
@@ -106,6 +109,22 @@ FG.revealed=(name,j=store.journey())=>{
 FG.characters=(j=store.journey())=>(D.roster?.characters||[]).filter(c=>FG.revealed(c.name,j));
 FG.everyone=()=>[...LORDS,...FG.characters().map(c=>c.name)];
 /* Is a support rank open at this point of the journey? null = open; otherwise why not (short + long text). */
+/* Who can be in the army at this point: Part I = this save file's path; Part II = the lord leading it; Part III = everyone
+   recruitable on a completed path, plus the lords. Rules come from research (supports.json → viewing.army) with these defaults. */
+FG.available=(name,j=store.journey(),lord=FG.lord())=>{
+  const A=D.supports?.viewing?.army||{};
+  if(j.part===0)return false;
+  const war=j.warLord||lord;
+  if(LORDS.includes(name)){if(j.part===1)return name===lord||!!A.otherLordsInPartI;if(j.part===2)return name===war||!!A.otherLordsInPartII;return true;}
+  const c=D.byName.get(name);if(!c||!FG.revealed(name,j))return false;
+  if(LORDS.some(L=>c.routes[L]?.status==='Prologue'))return j.part>=(A.prologueFromPart??2);
+  if(j.part===1)return FG.canJoin(name,lord,j);
+  if(j.part===2)return FG.canJoin(name,war,j);
+  if(LORDS.some(L=>c.routes[L]?.status==='Later'))return LORDS.some(L=>FG.canJoin(name,L,j));   // later recruits join in Part III
+  const paths=A.allRecruitsInPartIII||!j.paths.length?LORDS:j.paths;
+  return paths.some(L=>FG.canJoin(name,L,j));
+};
+const awayText=(n,j,lord)=>j.part===1?(LORDS.includes(n)?`${n}’s path only`:`${n} can’t join on ${lord}’s path`):j.part===2?`${n} isn’t in ${j.warLord||lord}’s army`:`${n} isn’t in your army yet`;
 FG.rankGate=(pr,r,j=store.journey(),lord=FG.lord())=>{
   const g=pr.gates?.[r]||{},min=g.minPart??pr.parts?.[r]??1,P=FG.partName;
   const rules=D.supports?.viewing||{};
@@ -117,8 +136,50 @@ FG.rankGate=(pr,r,j=store.journey(),lord=FG.lord())=>{
   if(g.notPath&&j.part===1&&lord===g.notPath)return{short:`not on ${lord}’s path`,text:`Not viewable on ${lord}’s path`};
   if(g.pathComplete&&!j.paths.includes(g.pathComplete))return{short:`after ${g.pathComplete}’s path`,text:`After completing ${g.pathComplete}’s path`};
   if(g.warLord&&j.part>=2&&j.warLord!==g.warLord)return{short:`${g.warLord} leading Part II`,text:`Only with ${g.warLord} leading Part II`};
+  for(const n of [pr.a,pr.b])if(n&&!FG.available(n,j,lord)){const t=awayText(n,j,lord);return{short:t,text:t,away:n};}
   return null;
 };
+/* Unwatched conversations this character has with your company that you can actually view on this path now. */
+FG.unseenWithCompany=(name,p=store.profile())=>{
+  let n=0;
+  (D.partners.get(name)||[]).forEach(m=>{
+    if(m===name||!FG.inCompany(m,p))return;
+    const pr=FG.pair(name,m),seen=FG.seen(name,m);
+    pr.ranks.forEach(r=>{if(!seen.includes(r)&&!FG.rankGate(pr,r))n++;});
+  });
+  return n;
+};
+/* Why recruiting someone on this Part I path is worth it. Part I only. */
+FG.recommendation=(name,p=store.profile())=>{
+  const j=store.journey(),L=p.lord,out={unseen:0,exclusive:0,only:false,easier:false,score:0,reasons:[],recommended:false};
+  if(!D.byName.has(name)||!FG.revealed(name,j))return out;
+  out.unseen=FG.unseenWithCompany(name,p);
+  if(out.unseen)out.reasons.push(['bond',`${out.unseen} unwatched support${out.unseen===1?'':'s'} with your company`]);
+  if(j.part!==1)return out;                 /* recruiting advice is for the Part I paths */
+  const sk=statusKey(FG.routeOf(name,L));
+  if(!(sk==='optional'||sk==='tutorial')||FG.inCompany(name,p))return out;
+  /* Supports viewable on this path but on no other Part I path. */
+  (D.partners.get(name)||[]).forEach(m=>{
+    const pr=FG.pair(name,m),seen=FG.seen(name,m);
+    pr.ranks.forEach(r=>{if(!seen.includes(r)&&!FG.rankGate(pr,r,j,L)&&LORDS.every(O=>O===L||FG.rankGate(pr,r,j,O)))out.exclusive++;});
+  });
+  const here=FG.routeOf(name,L),others=LORDS.filter(O=>O!==L&&FG.canJoin(name,O,j)).map(O=>FG.routeOf(name,O));
+  out.only=!others.length;
+  if(others.length&&here.support!=null&&here.renown!=null){
+    const s0=Math.min(...others.map(o=>o.support??99)),r0=Math.min(...others.map(o=>o.renown??99));
+    out.easier=here.support<=s0&&here.renown<=r0&&(here.support<s0||here.renown<r0);
+  }
+  const pl=(n,w)=>`${n} ${w}${n===1?'':'s'}`;
+  if(out.exclusive)out.reasons.push(['excl',`${pl(out.exclusive,'support')} only on ${L}’s path`]);
+  if(out.only)out.reasons.push(['only',`Only joins on ${L}’s path`]);
+  if(out.easier)out.reasons.push(['easy',`Easiest to recruit on ${L}’s path`]);
+  if(out.reasons[0]?.[0]==='bond')out.reasons.push(out.reasons.shift());   /* the unwatched count reads best last */
+  out.score=out.exclusive*4+(out.only?6:0)+(out.easier?3:0)+Math.min(out.unseen,8);
+  out.recommended=out.exclusive>0||out.only||out.score>=6;
+  return out;
+};
+FG.recommendOn=()=>FG.prefs.get('recommend')!==false;
+
 /* Visible pairs only: both characters revealed and the pair itself not sealed. */
 FG.rebuildPartners=()=>{
   D.partners=new Map();
@@ -159,7 +220,13 @@ FG.loadMeals=()=>FG.mealsReady||(FG.mealsReady=getJSON('data/meals.json').then(m
 /* ---------- Company: tri-state filters ---------- */
 let tab='all',ascending=true,activeName=null;
 const filterState=new Map();               // "group:key" -> 'inc' | 'exc'
-const statusKey=rt=>!rt?'unknown':rt.sealed?'sealed':rt.status==='Yes'?'optional':rt.status==='No'?'no':rt.status==='Prologue'?'prologue':rt.status==='Later'?'later':/tutorial/i.test(rt.status)?'tutorial':'auto';
+/* "Later" recruits (e.g. the rivals) become ordinary optional recruits once the journey reaches their Part. */
+const laterPart=rt=>{const m=String(rt?.window||'').match(/Part (I{1,3})\b/);return m?m[1].length:3;};
+FG.laterPart=laterPart;
+const statusKey=(rt,j=store.journey())=>!rt?'unknown':rt.sealed?'sealed':rt.status==='Yes'?'optional':rt.status==='No'?'no':rt.status==='Prologue'?'prologue':rt.status==='Later'?(j.part>=laterPart(rt)?'optional':'later'):/tutorial/i.test(rt.status)?'tutorial':'auto';
+const JOINS=new Set(['optional','auto','tutorial']);
+/* Can this character be in a lord's army (Part I path) at this point of the journey? */
+FG.canJoin=(name,lord=FG.lord(),j=store.journey())=>JOINS.has(statusKey(FG.routeOf(name,lord,j),j));
 const STATUS_LABEL={optional:'Optional recruit',auto:'Automatic team',tutorial:'Tutorial recruit',prologue:'Prologue companion',later:'Later recruit',no:'Not recruitable',sealed:'Recruitment sealed',unknown:'No data for this route'};
 const STATUS_SHORT={optional:'Optional',auto:'Team',tutorial:'Tutorial',prologue:'Prologue',later:'Later',no:'No',sealed:'Sealed',unknown:'—'};
 const STATUS_CLASS={optional:'s-optional',auto:'s-auto',tutorial:'s-tutorial',prologue:'s-auto',later:'s-tutorial',no:'s-no',sealed:'s-no',unknown:'s-no'};
@@ -170,7 +237,7 @@ const hasExtra=rt=>!!rt&&Array.isArray(rt.steps)&&rt.steps.length>0;
 function filterGroups(){
   const lord=FG.lord(),teamAll=[lord,...FG.team(lord)];
   return[
-    {id:'status',label:'Recruitment',opts:[['optional','Optional recruit'],['auto','Automatic team'],['tutorial','Tutorial recruit'],['prologue','Prologue companion'],['later','Later recruit'],['no','Not recruitable']],test:(c,k)=>statusKey(FG.routeOf(c.name))===k},
+    {id:'status',label:'Recruitment',opts:[['optional','Optional recruit'],['auto','Automatic team'],['tutorial','Tutorial recruit'],['prologue','Prologue companion'],['later','Later recruit'],['no','Not recruitable']],test:(c,k)=>{const sk=statusKey(FG.routeOf(c.name));return sk===k||(k==='later'&&sk==='sealed');}},
     {id:'marks',label:'Your marks',opts:[['wishlist','Wishlist'],['recruited','Recruited']],test:(c,k)=>store.profile()[k].includes(c.name)},
     {id:'partner',label:`Supports with ${lord}’s team`,opts:[...teamAll.map(n=>[n,n,true]),['none','No team supports listed']],
       test:(c,k)=>k==='none'?!teamAll.some(n=>n!==c.name&&FG.pair(c.name,n)):c.name!==k&&!!FG.pair(c.name,k)},
@@ -196,17 +263,25 @@ function renderActiveFilters(){
   const n=chips.length+terms.length+($('sort').value!=='game'||!ascending?1:0);
   $('filter-count').hidden=!n;$('filter-count').textContent=n;
 }
+/* Your filters, sort and recommendations switch are remembered on this device. */
+function saveFilters(){FG.prefs.set('company',{f:[...filterState],sort:$('sort').value,asc:ascending});}
+(()=>{const c=FG.prefs.get('company');if(!c)return;
+  if(Array.isArray(c.f))c.f.forEach(([k,v])=>{if(typeof k==='string'&&(v==='inc'||v==='exc'))filterState.set(k,v);});
+  if([...$('sort').options].some(o=>o.value===c.sort))$('sort').value=c.sort;
+  ascending=c.asc!==false;})();
+$('rec-toggle').checked=FG.recommendOn();
+$('rec-toggle').addEventListener('change',e=>{FG.prefs.set('recommend',e.target.checked);render({animate:false});if($('detail').open&&activeName)showDetail(activeName,false);});
 $('filter-groups').addEventListener('click',e=>{
   const b=e.target.closest('.tri');if(!b)return;
   const k=b.dataset.f,s=filterState.get(k)||'off',next={off:'inc',inc:'exc',exc:'off'}[s];
-  if(next==='off')filterState.delete(k);else filterState.set(k,next);
+  if(next==='off')filterState.delete(k);else filterState.set(k,next);saveFilters();
   renderFilterGroups();render({animate:false});
   const nb=$('filter-groups').querySelector(`[data-f="${CSS.escape(k)}"]`);
   if(nb){nb.focus();if(!reduceMotion())nb.classList.add('bump');}
 });
 $('active-filters').addEventListener('click',e=>{
   const b=e.target.closest('[data-clear]');if(!b)return;
-  if(b.dataset.clear==='*')filterState.clear();else filterState.delete(b.dataset.clear);
+  if(b.dataset.clear==='*')filterState.clear();else filterState.delete(b.dataset.clear);saveFilters();
   renderFilterGroups();render({animate:false});
   ($('active-filters').querySelector('[data-clear]')||$('search')).focus();
 });
@@ -214,6 +289,7 @@ $('active-filters').addEventListener('click',e=>{
 function sortValue(c,key){
   const rt=FG.routeOf(c.name);
   if(key==='game')return FG.orderIndex(c.name);
+  if(key==='recommend'){const r=FG.recommendation(c.name);return r.recommended?-r.score:r.score?1000-r.score:null;}
   if(key==='name')return c.name;
   if(key==='supports')return[FG.lord(),...FG.team()].filter(n=>n!==c.name&&FG.pair(c.name,n)).length;
   if(key==='gold'){if(!rt||rt.gold==='—')return null;const m=String(rt.gold).replaceAll(',','').match(/\d+/);return m?Number(m[0]):0;}
@@ -251,6 +327,18 @@ function teamChips(name){
   return chips.length?chips.join(''):'<span class="unknown">No team supports listed</span>';
 }
 const sealBadge='<span class="seal-badge" aria-hidden="true"><svg class="ico"><use href="#i-seal"/></svg></span>';
+function cardFlags(name){
+  const rec=FG.recommendation(name),on=FG.recommendOn()&&rec.recommended;
+  if(!rec.unseen&&!on)return '';
+  return `<span class="card-flags">`+(on?`<span class="rec-badge"><svg class="ico" aria-hidden="true"><use href="#i-spark"/></svg>Recommended</span>`:'')+
+    (rec.unseen?`<span class="unseen-pill" aria-label="${rec.unseen} unwatched support${rec.unseen===1?'':'s'} with your company"><svg class="ico" aria-hidden="true"><use href="#i-bond"/></svg>${rec.unseen}</span>`:'')+`</span>`;
+}
+function recSection(name){
+  const rec=FG.recommendation(name);
+  if(!rec.reasons.length||(!FG.recommendOn()&&!rec.unseen))return '';
+  const reasons=FG.recommendOn()?rec.reasons:rec.reasons.filter(([k])=>k==='bond');
+  return `<dt><svg class="ico" aria-hidden="true"><use href="#i-spark"/></svg>${rec.recommended&&FG.recommendOn()?'Why recruit here':'On this path'}</dt><dd><ul class="rec-reasons">${reasons.map(([k,t])=>`<li class="rr-${k}">${esc(t)}</li>`).join('')}</ul></dd>`;
+}
 function cardHTML(c,i){
   const p=store.profile(),rt=FG.routeOf(c.name),sk=statusKey(rt),wished=p.wishlist.includes(c.name),recruited=p.recruited.includes(c.name),picked=selecting&&selected.has(c.name);
   return `<article class="card${recruited?' is-recruited':''}${picked?' is-picked':''}" data-name="${esc(c.name)}" style="--i:${i}">`+
@@ -258,6 +346,7 @@ function cardHTML(c,i){
       (selecting?`<span class="pick-mark" aria-hidden="true"><svg class="ico"><use href="#i-check"/></svg></span>`:'')+
       `<span class="pf"><img src="${esc(c.portrait)}" alt="" width="68" height="82" loading="lazy" decoding="async">${recruited?sealBadge:''}</span>`+
       `<span class="cardtext"><span class="card-name">${esc(c.name)}</span><span class="status ${STATUS_CLASS[sk]}">${STATUS_LABEL[sk]}</span>${recruited?'<span class="recruited-mark"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Recruited</span>':''}`+
+      cardFlags(c.name)+
       `<span class="numbers"><span>Support lv.<b>${rt?.support??'—'}</b></span><span>Renown<b>${rt?.renown??'—'}</b></span></span></span>`+
     `</button>`+
     `<button class="star" aria-label="Wishlist ${esc(c.name)}" aria-pressed="${wished}"><svg class="ico" aria-hidden="true"><use href="#i-star"/></svg></button>`+
@@ -291,17 +380,17 @@ function updateHero(){
   $('save-chip-face').src=FG.portrait(lord);
   $('legend-lord').textContent=`Support lv. = with ${lord}`;
   if(!D.roster)return;
-  const joinable=FG.characters().filter(c=>{const rt=FG.routeOf(c.name);return rt&&rt.status!=='No'&&!rt.sealed;});
-  FG.countTo($('stat-recruitable'),joinable.length);
+  const joinable=FG.characters().filter(c=>FG.canJoin(c.name));
+  FG.countTo($('stat-recruitable'),joinable.filter(c=>!FG.inCompany(c.name,p)).length);
   FG.countTo($('stat-wishlist'),p.wishlist.length);
   FG.countTo($('stat-recruited'),p.recruited.length);
   const done=joinable.filter(c=>p.recruited.includes(c.name)).length;
   $('hero-bar-fill').style.setProperty('--p',(joinable.length?done/joinable.length*100:0)+'%');
 }
-function reset(){$('search').value='';filterState.clear();$('sort').value='game';ascending=true;$('view-title').textContent='The company';renderFilterGroups();render();}
+function reset(){$('search').value='';filterState.clear();$('sort').value='game';ascending=true;saveFilters();$('view-title').textContent='The company';renderFilterGroups();render();}
 $('search').addEventListener('input',()=>render({animate:false}));
-$('sort').addEventListener('change',()=>render());
-$('direction').onclick=()=>{ascending=!ascending;render();};
+$('sort').addEventListener('change',()=>{saveFilters();render();});
+$('direction').onclick=()=>{ascending=!ascending;saveFilters();render();};
 $('reset').onclick=reset;$('empty-reset').onclick=reset;
 $('filters-toggle').onclick=()=>{
   const open=$('filters').hidden;$('filters').hidden=!open;$('filters-toggle').setAttribute('aria-expanded',String(open));
@@ -339,8 +428,9 @@ document.querySelectorAll('[data-jump]').forEach(button=>button.addEventListener
   filterState.clear();
   const j=button.dataset.jump;
   if(j==='wishlist'||j==='recruited')filterState.set(`marks:${j}`,'inc');
-  if(j==='joinable')filterState.set('status:no','exc');
-  $('view-title').textContent={joinable:'Can join',wishlist:'Your wishlist',recruited:'Your recruits'}[j];
+  /* Can join = recruitable right now and not already in your company. */
+  if(j==='joinable')['status:no','status:later','status:prologue','status:auto','marks:recruited'].forEach(k=>filterState.set(k,'exc'));
+  $('view-title').textContent={joinable:'Can join',wishlist:'Your wishlist',recruited:'Your recruits'}[j];saveFilters();
   renderFilterGroups();setTab('all');
   requestAnimationFrame(()=>document.querySelector('.listmeta').scrollIntoView({behavior:reduceMotion()?'auto':'smooth',block:'start'}));
 }));
@@ -449,7 +539,7 @@ function stepMet(t){
   const j=store.journey(),part=t.match(/^Reach (Part (I{1,3}))\b/);
   if(part)return j.part>=part[2].length?'reached':'';
   const para=t.match(/^Clear (.+?)’s paralogue/);
-  if(para){const tag=`-paralogue-${para[1].toLowerCase().replace(/\s+/g,'-')}"`;return store.profiles().some(p=>p.viewed.some(k=>k.includes(tag)))?'cleared':'';}
+  if(para){const tag=`-paralogue-${para[1].toLowerCase().replace(/\s+/g,'-')}"`;return store.viewed().some(k=>k.includes(tag))?'cleared':'';}
   return '';
 }
 function recruitSteps(rt,sk){
@@ -473,6 +563,7 @@ function showDetail(name,open=true){
     (rt?.find?`<dt><svg class="ico" aria-hidden="true"><use href="#i-pin"/></svg>Where</dt><dd>${esc(rt.find)}</dd>`:'')+
     `<dt><svg class="ico" aria-hidden="true"><use href="#i-scroll"/></svg>Materials</dt><dd>${esc(rt?.materials??'—')}</dd>`+
     `<dt><svg class="ico" aria-hidden="true"><use href="#i-coin"/></svg>Gold</dt><dd>${esc(rt?.gold??'—')}</dd>`+
+    recSection(name)+
     `<dt><svg class="ico" aria-hidden="true"><use href="#i-spark"/></svg>How to recruit</dt><dd>${recruitSteps(rt,sk)}</dd>`+
     `<dt><svg class="ico" aria-hidden="true"><use href="#i-company"/></svg>Every lord</dt><dd>${lordTable(c)}</dd>`+
     `<dt><svg class="ico" aria-hidden="true"><use href="#i-bond"/></svg>Support conversations</dt><dd>${bondsSection(name)}</dd>`+
@@ -522,7 +613,7 @@ FG.wireSheet($('picker'),$('close-picker'),()=>{const f=pickerOpts.returnFocus;p
 /* ---------- Save files ---------- */
 const ago=t=>{const s=Math.round((Date.now()-t)/1000);if(s<10)return 'just now';if(s<60)return `${s}s ago`;const m=Math.round(s/60);if(m<60)return `${m} min ago`;const h=Math.round(m/60);if(h<24)return `${h} h ago`;return new Date(t).toLocaleDateString();};
 function fileStats(p){
-  return `${p.recruited.length} recruited · ${p.wishlist.length} wishlisted · ${p.viewed.length} missables`;
+  return `${p.recruited.length} recruited · ${p.wishlist.length} wishlisted`;
 }
 function fileHTML(p,active){
   return `<div class="file${active?' active':''}" data-file="${esc(p.id)}">`+
@@ -603,7 +694,7 @@ function refreshAll(){
   const lord=FG.lord();
   FG.rebuildPartners();
   if(lord!==lastLord){
-    for(const k of [...filterState.keys()])if(k.startsWith('partner:'))filterState.delete(k);
+    if(lastLord!==null){for(const k of [...filterState.keys()])if(k.startsWith('partner:'))filterState.delete(k);saveFilters();}
     lastLord=lord;renderFilterGroups();
   }
   updateHero();
