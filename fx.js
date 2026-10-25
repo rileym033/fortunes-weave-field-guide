@@ -1,5 +1,5 @@
 'use strict';
-/* Field Guide v2 — motion helpers. Everything here is decorative and switches off
+/* Field Guide — motion helpers. Everything here is decorative and switches off
    under prefers-reduced-motion. */
 (function(){
 const FG=window.FG=window.FG||{};
