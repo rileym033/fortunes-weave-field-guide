@@ -44,7 +44,7 @@ function mergeSupports(...maps){
   }
   return out;
 }
-/* Where the player is in the game. Defaults to Part I (where Bri was when this shipped). */
+/* Where the player is in the game. Defaults to Part I. */
 function normJourney(j){
   j=j&&typeof j==='object'?j:{};
   const part=Number.isInteger(j.part)&&j.part>=0&&j.part<=3?j.part:1;

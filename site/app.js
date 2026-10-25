@@ -1,5 +1,5 @@
 'use strict';
-/* Field Guide v2 — shell, data, save files, Company (tri-state filters), field notes. */
+/* Fortune’s Weave Field Guide — shell, data, save files, Company (tri-state filters), field notes. */
 const $=id=>document.getElementById(id);
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -83,7 +83,7 @@ FG.wireSheet=(dialog,closeButton,onClose)=>{
 /* ---------- Data ---------- */
 const D=FG.data={roster:null,supports:null,meals:null,byName:new Map(),pairs:new Map(),partners:new Map()};
 /* Bumped with each data release so phones never pair new code with cached old data. */
-const DATA_V='43';
+const DATA_V='44';
 FG.DATA_V=DATA_V;
 const getJSON=url=>fetch(`${url}?v=${DATA_V}`).then(r=>{if(!r.ok)throw Error(url);return r.json();});
 FG.pairKey=(a,b)=>a<b?`${a}|${b}`:`${b}|${a}`;

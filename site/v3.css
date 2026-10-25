@@ -417,3 +417,4 @@ body.bulk-open .toast{bottom:calc(env(safe-area-inset-bottom) + 86px + var(--bul
 .trio-lines li .tl-names{min-width:0}
 .trio-lines .rank-pips{gap:3px}
 .trio-lines .rank-pips .rp{width:19px;height:19px;font-size:9.5px}
+.endnote .copy{color:var(--gold-hi);font-weight:700;letter-spacing:.02em}
