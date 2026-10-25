@@ -13,11 +13,11 @@
 <title>Field Guide · Fortune’s Weave</title>
 <link rel="preload" href="fonts/cinzel-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/cormorant-garamond-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=42">
-<link rel="stylesheet" href="missables.css?v=42">
-<link rel="stylesheet" href="v2.css?v=42">
-<link rel="stylesheet" href="fx.css?v=42">
-<link rel="stylesheet" href="v3.css?v=42">
+<link rel="stylesheet" href="style.css?v=43">
+<link rel="stylesheet" href="missables.css?v=43">
+<link rel="stylesheet" href="v2.css?v=43">
+<link rel="stylesheet" href="fx.css?v=43">
+<link rel="stylesheet" href="v3.css?v=43">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -166,7 +166,7 @@
     <p class="eyebrow"><span class="eyebrow-gem" aria-hidden="true"></span>The inn at Dagsion</p>
     <h1 id="meals-heading" tabindex="-1">Share a meal</h1>
     <span class="weave-slot center" data-weave aria-hidden="true"></span>
-    <p class="subtitle">Seat three. Bonds grow between every pair at the table.</p>
+    <p class="subtitle">Seat three. Bonds grow between every pair at the table — so pick people who all still have scenes together.</p>
   </header>
   <div class="table-stage" id="table-stage">
     <svg class="table-links" id="table-links" viewBox="0 0 300 250" aria-hidden="true"></svg>
@@ -174,18 +174,20 @@
     <div id="seats"></div>
   </div>
   <div id="meal-pairs" class="meal-pairs" aria-live="polite"></div>
+  <details class="food-box" id="food-box" hidden><summary id="food-sum">Food</summary><div id="dish-list" class="dish-mini-list"></div></details>
+  <section class="meal-block" id="trio-block" aria-labelledby="trio-heading" hidden>
+    <div class="block-head"><h2 id="trio-heading">Trios</h2><span class="count-tag">Best first</span></div>
+    <p class="note" id="trio-why"></p>
+    <div id="trio-list" class="trio-list"></div>
+  </section>
   <section class="meal-block" aria-labelledby="rec-heading">
     <div class="block-head"><h2 id="rec-heading">Recommended guests</h2><span id="rec-count" class="count-tag"></span></div>
     <p class="note" id="rec-why"></p>
     <div class="toolbar slim inline">
       <label class="switch"><input type="checkbox" id="rec-wishlist"><span class="sw" aria-hidden="true"></span>Wishlist first</label>
-      <label class="switch"><input type="checkbox" id="rec-company"><span class="sw" aria-hidden="true"></span>Hide unrecruitable</label>
+      <label class="switch"><input type="checkbox" id="rec-company"><span class="sw" aria-hidden="true"></span>Recruited only</label>
     </div>
     <div id="rec-list" class="rec-list"></div>
-  </section>
-  <section class="meal-block" id="dish-block" aria-labelledby="dish-heading">
-    <div class="block-head"><h2 id="dish-heading">What to order</h2><span id="dish-count" class="count-tag"></span></div>
-    <div id="dish-list" class="dish-list"></div>
   </section>
   <details class="spoiler-links rules-box" id="meal-rules-box"><summary>How meals work</summary><ul id="meal-rules" class="rules"></ul></details>
 </section>
@@ -348,12 +350,12 @@
     <div class="lord-pick" id="new-file-lords"></div>
   </div>
 </dialog>
-<script src="store.js?v=42"></script>
-<script src="fx.js?v=42" defer></script>
-<script src="app.js?v=42" defer></script>
-<script src="journey.js?v=42" defer></script>
-<script src="supports.js?v=42" defer></script>
-<script src="meals.js?v=42" defer></script>
-<script src="missables.js?v=42" defer></script>
+<script src="store.js?v=43"></script>
+<script src="fx.js?v=43" defer></script>
+<script src="app.js?v=43" defer></script>
+<script src="journey.js?v=43" defer></script>
+<script src="supports.js?v=43" defer></script>
+<script src="meals.js?v=43" defer></script>
+<script src="missables.js?v=43" defer></script>
 </body>
 </html>
