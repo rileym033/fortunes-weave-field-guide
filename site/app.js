@@ -83,7 +83,7 @@ FG.wireSheet=(dialog,closeButton,onClose)=>{
 /* ---------- Data ---------- */
 const D=FG.data={roster:null,supports:null,meals:null,byName:new Map(),pairs:new Map(),partners:new Map()};
 /* Bumped with each data release so phones never pair new code with cached old data. */
-const DATA_V='42';
+const DATA_V='43';
 FG.DATA_V=DATA_V;
 const getJSON=url=>fetch(`${url}?v=${DATA_V}`).then(r=>{if(!r.ok)throw Error(url);return r.json();});
 FG.pairKey=(a,b)=>a<b?`${a}|${b}`:`${b}|${a}`;
@@ -156,6 +156,43 @@ FG.rankGate=(pr,r,j=store.journey(),lord=FG.lord(),opts={})=>{
   }
   return null;
 };
+/* Has this rank's window already closed for good (Part ended, chapter passed, or an earlier scene in a chain locked it)?
+   Later Parts / other paths / low levels are NOT "passed" — raising support now still counts. */
+FG.rankPassed=(pr,r,j=store.journey())=>{
+  const g=pr.gates?.[r]||{},ch=store.profile().chapter;
+  if(g.maxPart!=null&&j.part>g.maxPart)return true;
+  if(g.untilCh&&(j.part>1||(ch&&ch>g.untilCh)))return true;
+  for(const [x,y,r2] of g.before||[])if(FG.seen(x,y).includes(r2))return true;
+  return false;
+};
+/* Everything a meal could still do for a pair: open = unwatched ranks whose window hasn't passed (in order),
+   ready = the next one can be watched right now. */
+FG.pairOutlook=(a,b)=>{
+  const pr=FG.pair(a,b);if(!pr)return null;
+  const seen=FG.seen(a,b),lv=store.supports()[FG.pairKey(a,b)]?.level??1;
+  const unseen=pr.ranks.filter(r=>!seen.includes(r));
+  if(!unseen.length)return{pr,lv,open:[],done:true};
+  const open=[];for(const r of unseen){if(FG.rankPassed(pr,r))break;open.push(r);}
+  if(!open.length)return{pr,lv,open,passed:true};
+  const next=open[0],need=FG.rankLevel(pr,next),gate=FG.rankGate(pr,next);
+  return{pr,lv,open,next,need,gate,ready:lv>=need&&!gate};
+};
+/* C · B · A gems for a pair, in fixed columns (a rank the pair doesn't have leaves a blank slot):
+   watched = filled gold, ready = glowing teal, still possible = gold outline, locked out for good = grey. */
+FG.rankPipsHTML=(a,b)=>{
+  const o=FG.pairOutlook(a,b);if(!o)return '';
+  const seen=FG.seen(a,b),words=[];
+  const cells=['C','B','A'].map(r=>{
+    if(!o.pr.ranks.includes(r))return '<i class="rp gap" aria-hidden="true"></i>';
+    const st=seen.includes(r)?'on':o.open?.includes(r)?(r===o.next&&o.ready?'ready':'open'):'gone';
+    words.push(`${r} ${({on:'watched',ready:'ready to watch',open:'still to come',gone:'locked out'})[st]}`);
+    return `<i class="rp ${st}" aria-hidden="true">${r}</i>`;
+  }).join('');
+  return `<span class="rank-pips" role="img" aria-label="${esc(words.join(', '))}">${cells}</span>`;
+};
+/* Who can sit at a meal right now: in your army at this point of the journey (recruited or a Guest), minus anyone the game never seats. */
+FG.mealGuest=name=>!D.byName.get(name)?.noMeals&&FG.available(name);
+
 /* Unwatched conversations this character has with your company that you can actually view on this path now. */
 FG.unseenWithCompany=(name,p=store.profile())=>{
   let n=0;

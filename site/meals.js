@@ -1,12 +1,12 @@
 'use strict';
-/* Meals — seat three, see every pair's next conversation, get guest + dish suggestions. */
+/* Meals — seat three, see every pair's next conversation, get trio and guest suggestions (food is extra info). */
 (function(){
 const store=FG.store,D=FG.data;
 const SEAT_POS=[{x:150,y:44},{x:52,y:196},{x:248,y:196}];
 const PREF_SCORE={love:2,like:1,neutral:0,dislike:-2};
 const PREF_ICON={love:'♥',like:'✓',neutral:'–',dislike:'✕'};
 const MP=FG.prefs.get('meals')||{};
-let prefsWishlist=!!MP.wishlist,hideNo=!!MP.company,prevSeats=null,prevPairs=new Set(),wasFull=false;
+let prefsWishlist=!!MP.wishlist,recruitedOnly=!!MP.recruitedOnly,prevSeats=null,prevPairs=new Set(),wasFull=false;
 
 /* A seated guest the journey hasn't revealed yet shows as an empty seat; the saved name is kept for later. */
 const rawSeats=()=>store.profile().meal.seats.slice();
@@ -20,21 +20,36 @@ FG.planMeal=names=>{
   setSeats(next);FG.setTab('meals');
 };
 
+/* What a meal would do for a pair: uses FG.pairOutlook (unwatched ranks whose window hasn't passed). */
 function pairInfo(a,b){
-  const pr=FG.pair(a,b);
-  if(!pr)return{has:false,text:'No support conversations listed'};
-  const next=FG.nextRank(a,b),lv=store.supports()[FG.pairKey(a,b)]?.level??1;
-  if(!next)return{has:true,done:true,text:'Every listed conversation viewed',max:pr.maxRank};
-  /* Same rule as Supports: the pair's own level for this rank, and the journey must allow it. */
-  const need=FG.rankLevel(pr,next),gate=FG.rankGate(pr,next),ready=lv>=need&&!gate;
-  return{has:true,next,need,lv,ready,remaining:pr.ranks.length-FG.seen(a,b).length,max:pr.maxRank,
-    text:ready?`${next} ready to view`:gate?`Next: ${next} · ${gate.short}`:`Next: ${next} at support level ${need}`};
+  const o=FG.pairOutlook(a,b);
+  if(!o)return{has:false,text:'No support conversations listed'};
+  if(o.done)return{has:true,done:true,text:'Every listed conversation viewed',max:o.pr.maxRank};
+  if(o.passed)return{has:true,done:true,passed:true,text:'Locked out — the window has passed',max:o.pr.maxRank};
+  return{has:true,next:o.next,need:o.need,lv:o.lv,ready:o.ready,gate:o.gate,remaining:o.open.length,max:o.pr.maxRank,
+    text:o.ready?`${o.next} ready to view`:o.gate?`Next: ${o.next} · ${o.gate.short}`:`Next: ${o.next} at support level ${o.need}${o.lv>1?` · now ${o.lv}`:''}`};
+}
+/* Short line for a recommendation: "Olympia: B ready", "Sirocco: C at lv. 2 (now 1)", "+2 more". */
+function bondLine(n,s){
+  const i=pairInfo(n,s);if(!i.has||i.done)return null;
+  return{cls:i.ready?'ready':i.gate?'later':'bond',partner:s,pips:FG.rankPipsHTML(n,s),
+    text:i.ready?`${i.next} ready`:i.gate?`${i.next} ${i.gate.short}`:`${i.next} at lv. ${i.need}${i.lv>1?` · now ${i.lv}`:''}`};
+}
+/* One row per partner: face, C·B·A gems, what's next. */
+const bondRow=r=>`<div class="bond-row br-${r.cls}"><img src="${esc(FG.portrait(r.partner))}" alt=""><span class="br-name">${esc(r.partner)}</span>${r.pips}<span class="br-next">${esc(r.text)}</span></div>`;
+/* How much a meal is worth for one pair. Ready-to-watch scenes first, then how many scenes are still open. */
+const edgeCache=new Map();
+function edge(a,b){
+  const k=FG.pairKey(a,b);if(edgeCache.has(k))return edgeCache.get(k);
+  const i=pairInfo(a,b),v=!i.has||i.done?0:(i.ready?12:0)+i.remaining*3+(!i.gate&&i.need-i.lv<=1?2:0)+(i.next==='C'?1:0);
+  edgeCache.set(k,v);return v;
 }
 function prefOf(name,dishId){
   const p=D.meals?.preferences?.[name];if(!p)return null;
   for(const k of ['love','like','neutral','dislike'])if(p[k]?.includes(dishId))return k;
   return null;
 }
+/* Food is extra information only — it never affects who is recommended. */
 function dishRanking(people){
   const m=D.meals;if(!m||!m.dishes?.length||!people.length)return[];
   return m.dishes.map(d=>{
@@ -45,28 +60,44 @@ function dishRanking(people){
     return{d,reactions,score,perfect,unknown:reactions.length-known.length};
   }).filter(x=>x.reactions.some(r=>r.pref)).sort((a,b)=>(b.perfect-a.perfect)||b.score-a.score||a.unknown-b.unknown||a.d.name.localeCompare(b.d.name));
 }
+/* Everyone who can sit at this table now (Eshmel never can; Guests need a gift first). */
+function pool(){
+  const p=store.profile();
+  return FG.everyone().filter(n=>FG.mealGuest(n)).filter(n=>!recruitedOnly||FG.inCompany(n,p));
+}
+const wishBonus=n=>{const p=store.profile();return p.wishlist.includes(n)&&!p.recruited.includes(n)?(prefsWishlist?40:4):0;};
+const companyBonus=n=>FG.inCompany(n)?1:0;
+/* Trios: three people who all still have scenes with each other. With 0 or 1 seated, suggest whole trios. */
+function trios(seated,limit=4){
+  const P=pool().filter(n=>!seated.includes(n)),out=[];
+  if(seated.length===1){
+    const s=seated[0],near=P.filter(n=>edge(s,n)>0);
+    for(let i=0;i<near.length;i++)for(let k=i+1;k<near.length;k++){
+      const x=near[i],y=near[k],xy=edge(x,y);if(!xy)continue;
+      out.push({names:[s,x,y],score:edge(s,x)+edge(s,y)+xy+wishBonus(x)+wishBonus(y)+companyBonus(x)+companyBonus(y)});
+    }
+  }else if(!seated.length){
+    for(let i=0;i<P.length;i++)for(let k=i+1;k<P.length;k++){
+      const a=P[i],b=P[k],ab=edge(a,b);if(!ab)continue;
+      for(let m=k+1;m<P.length;m++){const c=P[m],ac=edge(a,c),bc=edge(b,c);if(!ac||!bc)continue;
+        out.push({names:[a,b,c],score:ab+ac+bc+wishBonus(a)+wishBonus(b)+wishBonus(c)+companyBonus(a)+companyBonus(b)+companyBonus(c)});}
+    }
+  }
+  return out.sort((x,y)=>y.score-x.score||x.names.join().localeCompare(y.names.join())).slice(0,limit);
+}
+/* One-at-a-time suggestions. With two seated, anyone who still has scenes with BOTH completes a trio and goes first. */
 function recommend(){
   const seated=seats().filter(Boolean),p=store.profile(),lord=p.lord;
-  const pool=FG.everyone().filter(n=>!seated.includes(n));
-  return pool.map(n=>{
-    let score=0;const reasons=[];
-    seated.forEach(s=>{
-      const info=pairInfo(n,s);
-      if(info.has&&!info.done){score+=10+info.remaining*3+(info.ready?12:0)+(info.next==='C'?2:0);reasons.push({cls:info.ready?'ready':'bond',text:`${s}: ${info.ready?`${info.next} ready`:`next ${info.next}`}`});}
-      else if(info.has&&info.done){score+=1;}
-    });
-    const rt=FG.routeOf(n);
-    const wished=p.wishlist.includes(n)&&!p.recruited.includes(n);
-    if(wished&&seated.includes(lord)){score+=prefsWishlist?60:8;reasons.push({cls:'wish',text:`Wishlist · needs lv. ${rt?.support??'?'}`});}
-    else if(wished&&prefsWishlist){score+=30;reasons.push({cls:'wish',text:'Wishlist'});}
-    if(D.meals&&seated.length){
-      const perfect=dishRanking([...seated,n]).filter(x=>x.reactions.every(r=>r.pref==='love'||r.pref==='like')).length;
-      if(perfect){score+=Math.min(perfect,4)*1.5;reasons.push({cls:'food',text:`${perfect} dish${perfect===1?'':'es'} everyone likes`});}
-    }
-    return{n,score,reasons,status:FG.statusKey(rt),inCompany:FG.inCompany(n)};
-  }).filter(x=>!(hideNo&&x.status==='no'))
-    .filter(x=>x.score>0||!seated.length)
-    .sort((a,b)=>b.score-a.score||(b.inCompany-a.inCompany)||a.n.localeCompare(b.n)).slice(0,12);
+  return pool().filter(n=>!seated.includes(n)).map(n=>{
+    const lines=seated.map(s=>bondLine(n,s)).filter(Boolean),links=lines.length;
+    let score=seated.reduce((t,s)=>t+edge(n,s),0)+wishBonus(n)+companyBonus(n);
+    const trio=seated.length===2&&links===2;
+    if(trio)score+=50;
+    const reasons=[...(trio?[{cls:'trio',text:'Completes a trio'}]:[])];
+    if(p.wishlist.includes(n)&&!p.recruited.includes(n))reasons.push({cls:'wish',text:seated.includes(lord)?`Wishlist · needs lv. ${FG.routeOf(n)?.support??'?'} with ${lord}`:'Wishlist'});
+    return{n,score,reasons,lines,trio,links,inCompany:FG.inCompany(n,p)};
+  }).filter(x=>seated.length?x.links>0:x.score>0)
+    .sort((a,b)=>b.score-a.score||(b.inCompany-a.inCompany)||FG.byGameOrder(a.n,b.n)).slice(0,12);
 }
 
 function renderTable(){
@@ -103,30 +134,45 @@ function renderTable(){
   const pairs=[];
   for(let i=0;i<3;i++)for(let j=i+1;j<3;j++)if(s[i]&&s[j])pairs.push([s[i],s[j]]);
   $('meal-pairs').innerHTML=pairs.length?pairs.map(([a,b])=>{const info=pairInfo(a,b);
-    return `<button type="button" class="meal-pair ${!info.has?'none':info.done?'done':info.ready?'ready':'open'}" data-pa="${esc(a)}" data-pb="${esc(b)}"><span class="mp-faces"><img src="${esc(FG.portrait(a))}" alt=""><img src="${esc(FG.portrait(b))}" alt=""></span><span class="mp-text"><b>${esc(a)} &amp; ${esc(b)}</b><small>${esc(info.text)}</small></span>${info.has?FG.rankGem(info.done?info.max:info.next,info.done):''}</button>`;}).join('')
+    return `<button type="button" class="meal-pair ${!info.has?'none':info.passed?'passed':info.done?'done':info.ready?'ready':'open'}" data-pa="${esc(a)}" data-pb="${esc(b)}"><span class="mp-faces"><img src="${esc(FG.portrait(a))}" alt=""><img src="${esc(FG.portrait(b))}" alt=""></span><span class="mp-text"><b>${esc(a)} &amp; ${esc(b)}</b><small>${esc(info.text)}</small></span>${info.has?FG.rankPipsHTML(a,b):''}</button>`;}).join('')
     :`<p class="note center">${filled.length?'Add another guest to see how this table’s bonds line up.':'Tap a seat to invite someone.'}</p>`;
 }
-function renderRecs(){
-  const seated=seats().filter(Boolean),recs=recommend(),full=seats().every(Boolean);
-  $('rec-count').textContent=full?'Table full':`${recs.length} suggestions`;
-  $('rec-why').textContent=!seated.length?'Seat your lord first — most meals include them.':
-    `Ranked by unwatched conversations with ${seated.join(seated.length>1?' and ':'')}${D.meals?', plus food everyone enjoys':''}.`;
-  $('rec-list').innerHTML=recs.map((x,i)=>
-    `<article class="rec" style="--i:${i}"><button type="button" class="rec-open" data-info="${esc(x.n)}" aria-label="${esc(x.n)} field note"><span class="pf sm"><img src="${esc(FG.portrait(x.n))}" alt="" loading="lazy"></span></button>`+
-    `<div class="rec-text"><b>${esc(x.n)}${x.inCompany?'':' <small class="guest">Guest</small>'}</b><div class="reasons">${x.reasons.slice(0,3).map(r=>`<span class="reason ${r.cls}">${esc(r.text)}</span>`).join('')||'<span class="reason">No listed conversations with this table</span>'}</div></div>`+
-    `<button type="button" class="seat-add" data-add="${esc(x.n)}" ${full?'disabled':''} aria-label="Seat ${esc(x.n)}"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg></button></article>`).join('')||'<p class="unknown">No suggestions with these filters.</p>';
+function trioCard(t,i,seated){
+  const [a,b,c]=t.names,pairs=[[a,b],[a,c],[b,c]];
+  return `<article class="trio" style="--i:${i}">`+
+    `<div class="trio-faces" aria-hidden="true">${t.names.map((n,k)=>`<img src="${esc(FG.portrait(n))}" alt="" style="--k:${k}"${seated.includes(n)?' class="seated"':''}>`).join('')}<svg viewBox="0 0 60 52"><path d="M30 6 L6 46 L54 46 Z"/></svg></div>`+
+    `<div class="trio-text"><b>${t.names.map(esc).join(' · ')}</b><span class="trio-tag">Trio · every pair has scenes</span>`+
+    `<ul class="trio-lines">${pairs.map(([x,y])=>{const i=pairInfo(x,y);return `<li class="${i.ready?'ready':i.gate?'later':''}"><span class="tl-names">${esc(x)} &amp; ${esc(y)}</span>${FG.rankPipsHTML(x,y)}<em>${esc(i.ready?`${i.next} ready`:i.gate?`${i.next} · ${i.gate.short}`:`${i.next} at lv. ${i.need}`)}</em></li>`;}).join('')}</ul></div>`+
+    `<button type="button" class="seat-trio goldbtn small" data-trio="${esc(t.names.join('|'))}" aria-label="Seat ${esc(t.names.join(', '))}">Seat</button></article>`;
 }
+function renderRecs(){
+  edgeCache.clear();
+  const seated=seats().filter(Boolean),full=seats().every(Boolean);
+  const ts=full||seated.length>=2?[]:trios(seated);
+  $('trio-block').hidden=!ts.length;
+  $('trio-why').textContent=seated.length?`${seated[0]} plus two people who all still have support scenes with each other — every pair at the table gains.`:'Three people who all still have support scenes with each other — every pair at the table gains.';
+  $('trio-list').innerHTML=ts.map((t,i)=>trioCard(t,i,seated)).join('');
+  const recs=full?[]:recommend();
+  $('rec-count').textContent=full?'Table full':`${recs.length} suggestions`;
+  $('rec-why').textContent=full?'Remove a guest to see suggestions.':!seated.length?'Seat someone, or pick a trio above. Suggestions rank who still has support scenes with your table — scenes ready to watch first.':
+    seated.length===2?`Anyone who still has scenes with both ${seated[0]} and ${seated[1]} completes a trio and comes first.`:
+    `Ranked by support scenes still open with ${seated[0]} — ready-to-watch first, then how many are left.`;
+  $('rec-list').innerHTML=recs.map((x,i)=>
+    `<article class="rec${x.trio?' trio-pick':''}" style="--i:${i}"><button type="button" class="rec-open" data-info="${esc(x.n)}" aria-label="${esc(x.n)} field note"><span class="pf sm"><img src="${esc(FG.portrait(x.n))}" alt="" loading="lazy"></span></button>`+
+    `<div class="rec-text"><b>${esc(x.n)}${x.inCompany?'':' <small class="guest">Guest</small>'}</b>${x.reasons.length?`<div class="reasons">${x.reasons.map(r=>`<span class="reason ${r.cls}">${esc(r.text)}</span>`).join('')}</div>`:''}`+
+      `${x.lines.length?`<div class="bond-rows">${x.lines.map(bondRow).join('')}</div>`:''}</div>`+
+    `<button type="button" class="seat-add" data-add="${esc(x.n)}" ${full?'disabled':''} aria-label="Seat ${esc(x.n)}"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg></button></article>`).join('')||(full?'':'<p class="unknown">No one here still has open support scenes with this table.</p>');
+}
+/* Food is just extra information: a small, collapsed line of icons. */
 function renderDishes(){
-  const seated=seats().filter(Boolean),block=$('dish-block');
-  if(!D.meals||!D.meals.dishes?.length){block.hidden=true;return;}
-  block.hidden=false;
-  const ranked=dishRanking(seated).slice(0,8);
-  $('dish-count').textContent=ranked.filter(x=>x.perfect).length?`${ranked.filter(x=>x.perfect).length} perfect`:'';
-  $('dish-list').innerHTML=!seated.length?'<p class="note">Seat guests to see what they’d enjoy.</p>':ranked.length?ranked.map(x=>
-    `<div class="dish${x.perfect?' perfect':''}"><div class="dish-name"><b>${esc(x.d.name)}</b>${x.perfect?'<span class="perfect-tag">Perfect meal</span>':''}${x.d.price?`<small>${esc(x.d.price)}G</small>`:''}</div>`+
-    `<div class="dish-faces">${x.reactions.map(r=>`<span class="df ${r.pref||'unknown'}" title="${esc(r.n)}: ${r.pref||'unknown'}"><img src="${esc(FG.portrait(r.n))}" alt=""><i aria-hidden="true">${r.pref?PREF_ICON[r.pref]:'?'}</i><span class="sr-only">${esc(r.n)} ${r.pref||'unknown'}</span></span>`).join('')}</div></div>`).join('')
-    :'<p class="note">No food preferences are recorded for this table yet.</p>';
-  if(D.meals.coverage)$('dish-list').insertAdjacentHTML('beforeend',`<p class="note">${esc(D.meals.coverage)}</p>`);
+  const seated=seats().filter(Boolean),box=$('food-box');
+  if(!D.meals||!D.meals.dishes?.length||seated.length<2){box.hidden=true;$('dish-list').innerHTML='';return;}
+  box.hidden=false;
+  const ranked=dishRanking(seated),perfect=ranked.filter(x=>x.perfect);
+  $('food-sum').innerHTML=`<svg class="ico" aria-hidden="true"><use href="#i-meal"/></svg>Food${perfect.length?` · <b>${perfect.length}</b> everyone likes`:''}`;
+  $('dish-list').innerHTML=ranked.slice(0,6).map(x=>
+    `<div class="dish-mini${x.perfect?' perfect':''}"><span class="dm-name">${esc(x.d.name)}</span><span class="dm-faces">${x.reactions.map(r=>`<i class="dm ${r.pref||'unknown'}" title="${esc(r.n)}: ${r.pref||'unknown'}" aria-label="${esc(r.n)}: ${r.pref||'unknown'}">${r.pref?PREF_ICON[r.pref]:'?'}</i>`).join('')}</span></div>`).join('')+
+    `<p class="note">Just for fun — food doesn’t change who’s recommended. ${esc(D.meals.coverage||'')}</p>`;
 }
 function renderRules(){
   const rules=D.meals?.rules||['Up to three meals a week at the inn, each for three characters.','A Guest must have received one of your gifts before they can be invited.','The more all three enjoy the dish, the more their bonds grow.'];
@@ -142,7 +188,10 @@ $('seats').addEventListener('click',e=>{
   if(clear){const i=+clear.dataset.clearSeat,s=seats();s[i]=null;setSeats(s);$('seats').querySelector(`[data-seat="${i}"]`)?.focus();return;}
   if(seat){
     const i=+seat.dataset.seat,s=seats();
-    FG.pickCharacter({title:`Seat ${i+1}`,current:s[i],exclude:s.filter((n,j)=>n&&j!==i),returnFocus:()=>$('seats').querySelector(`[data-seat="${i}"]`)},name=>{const t=seats();t[i]=name;setSeats(t);});
+    const others=s.filter((n,j)=>n&&j!==i);
+    FG.pickCharacter({title:`Seat ${i+1}`,current:s[i],exclude:others,names:FG.everyone().filter(n=>FG.mealGuest(n)),returnFocus:()=>$('seats').querySelector(`[data-seat="${i}"]`),
+      badge:n=>{edgeCache.clear();const k=others.filter(o=>pairInfo(n,o).has&&!pairInfo(n,o).done).length;return others.length?`<small class="pick-meta${k===others.length?' all':''}">${k}/${others.length} bonds</small>`:'';}},
+      name=>{const t=seats();t[i]=name;setSeats(t);});
   }
 });
 $('rec-list').addEventListener('click',e=>{
@@ -159,10 +208,23 @@ $('rec-list').addEventListener('click',e=>{
 });
 $('meal-pairs').addEventListener('click',e=>{const b=e.target.closest('[data-pa]');if(!b||!FG.pair(b.dataset.pa,b.dataset.pb))return;const pa=b.dataset.pa,pb=b.dataset.pb;
   FG.openPair(pa,pb,()=>[...$('meal-pairs').querySelectorAll('[data-pa]')].find(x=>x.dataset.pa===pa&&x.dataset.pb===pb));});
-const saveMp=()=>FG.prefs.set('meals',{wishlist:prefsWishlist,company:hideNo});
-$('rec-wishlist').checked=prefsWishlist;$('rec-company').checked=hideNo;
+const saveMp=()=>FG.prefs.set('meals',{wishlist:prefsWishlist,recruitedOnly});
+$('rec-wishlist').checked=prefsWishlist;$('rec-company').checked=recruitedOnly;
 $('rec-wishlist').addEventListener('change',e=>{prefsWishlist=e.target.checked;saveMp();renderRecs();});
-$('rec-company').addEventListener('change',e=>{hideNo=e.target.checked;saveMp();renderRecs();});
+$('rec-company').addEventListener('change',e=>{recruitedOnly=e.target.checked;saveMp();renderRecs();});
+/* Seat a whole trio: keep whoever is already seated, fill the rest. */
+$('trio-list').addEventListener('click',e=>{
+  const b=e.target.closest('[data-trio]');if(!b)return;
+  const names=b.dataset.trio.split('|'),cur=seats(),keep=cur.filter(n=>n&&names.includes(n)),add=names.filter(n=>!keep.includes(n));
+  const next=cur.map(n=>n&&names.includes(n)?n:null);add.forEach(n=>{const i=next.indexOf(null);if(i>=0)next[i]=n;});
+  /* The card re-renders when seats change, so fly from stand-ins left where its faces were. */
+  const stand=[...b.closest('.trio').querySelectorAll('.trio-faces img')].map(img=>{const r=img.getBoundingClientRect(),c=img.cloneNode();
+    Object.assign(c.style,{position:'fixed',left:r.left+'px',top:r.top+'px',width:r.width+'px',height:r.height+'px',opacity:'0',pointerEvents:'none',margin:'0'});document.body.appendChild(c);return c;});
+  setSeats(next);FG.toast(`${names.join(', ')} sit down together`);FG.haptic?.('success');
+  next.forEach((n,i)=>{if(add.includes(n)){const seat=$('seats').querySelector(`[data-seat="${i}"] img`);setTimeout(()=>FG.fly(stand[names.indexOf(n)],seat),i*90);}});
+  setTimeout(()=>stand.forEach(c=>c.remove()),1200);
+  $('seats').querySelector('[data-seat]')?.focus({preventScroll:true});
+});
 
 FG.onMealsShown=()=>{FG.ready.then(()=>{render();FG.loadMeals().then(()=>{if(FG.currentTab()==='meals')render();});});};
 /* Redraw even while hidden, so nothing the journey has re-sealed lingers in the page. */
