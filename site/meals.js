@@ -66,6 +66,14 @@ function pool(){
   return FG.everyone().filter(n=>FG.mealGuest(n)).filter(n=>!recruitedOnly||FG.inCompany(n,p));
 }
 const wishBonus=n=>{const p=store.profile();return p.wishlist.includes(n)&&!p.recruited.includes(n)?(prefsWishlist?40:4):0;};
+/* With your lord at the table, a meal also raises their support level towards recruiting someone.
+   Still below the recruit level → a small boost (a little more the further there is to go, and if wishlisted). */
+function lordBonus(n,lordSeated){
+  if(!lordSeated)return 0;
+  const r=FG.recruitLevel(n);if(!r||r.met)return 0;
+  const p=store.profile();
+  return 3+(r.short>=2?1:0)+(p.wishlist.includes(n)?3:0);      /* a nudge: a pair with an open scene is worth ~3–12 */
+}
 const companyBonus=n=>FG.inCompany(n)?1:0;
 /* Trios: three people who all still have scenes with each other. With 0 or 1 seated, suggest whole trios. */
 function trios(seated,limit=4){
@@ -74,13 +82,15 @@ function trios(seated,limit=4){
     const s=seated[0],near=P.filter(n=>edge(s,n)>0);
     for(let i=0;i<near.length;i++)for(let k=i+1;k<near.length;k++){
       const x=near[i],y=near[k],xy=edge(x,y);if(!xy)continue;
-      out.push({names:[s,x,y],score:edge(s,x)+edge(s,y)+xy+wishBonus(x)+wishBonus(y)+companyBonus(x)+companyBonus(y)});
+      const L=s===store.profile().lord;
+      out.push({names:[s,x,y],score:edge(s,x)+edge(s,y)+xy+wishBonus(x)+wishBonus(y)+companyBonus(x)+companyBonus(y)+lordBonus(x,L)+lordBonus(y,L)});
     }
   }else if(!seated.length){
     for(let i=0;i<P.length;i++)for(let k=i+1;k<P.length;k++){
       const a=P[i],b=P[k],ab=edge(a,b);if(!ab)continue;
       for(let m=k+1;m<P.length;m++){const c=P[m],ac=edge(a,c),bc=edge(b,c);if(!ac||!bc)continue;
-        out.push({names:[a,b,c],score:ab+ac+bc+wishBonus(a)+wishBonus(b)+wishBonus(c)+companyBonus(a)+companyBonus(b)+companyBonus(c)});}
+        const lord=store.profile().lord,L=[a,b,c].includes(lord),lb=[a,b,c].reduce((t,n)=>t+lordBonus(n,L),0);
+        out.push({names:[a,b,c],score:ab+ac+bc+wishBonus(a)+wishBonus(b)+wishBonus(c)+companyBonus(a)+companyBonus(b)+companyBonus(c)+lb});}
     }
   }
   return out.sort((x,y)=>y.score-x.score||x.names.join().localeCompare(y.names.join())).slice(0,limit);
@@ -89,14 +99,15 @@ function trios(seated,limit=4){
 function recommend(){
   const seated=seats().filter(Boolean),p=store.profile(),lord=p.lord;
   return pool().filter(n=>!seated.includes(n)).map(n=>{
-    const lines=seated.map(s=>bondLine(n,s)).filter(Boolean),links=lines.length;
-    let score=seated.reduce((t,s)=>t+edge(n,s),0)+wishBonus(n)+companyBonus(n);
+    const lines=seated.map(s=>bondLine(n,s)).filter(Boolean),links=lines.length,lb=lordBonus(n,seated.includes(lord)),rl=lb?FG.recruitLevel(n):null;
+    let score=seated.reduce((t,s)=>t+edge(n,s),0)+wishBonus(n)+companyBonus(n)+lb;
     const trio=seated.length===2&&links===2;
     if(trio)score+=50;
     const reasons=[...(trio?[{cls:'trio',text:'Completes a trio'}]:[])];
-    if(p.wishlist.includes(n)&&!p.recruited.includes(n))reasons.push({cls:'wish',text:seated.includes(lord)?`Wishlist · needs lv. ${FG.routeOf(n)?.support??'?'} with ${lord}`:'Wishlist'});
-    return{n,score,reasons,lines,trio,links,inCompany:FG.inCompany(n,p)};
-  }).filter(x=>seated.length?x.links>0:x.score>0)
+    if(rl)reasons.push({cls:'recruit',text:`Recruit: lv. ${rl.lv}/${rl.need} with ${lord}`});
+    if(p.wishlist.includes(n)&&!p.recruited.includes(n))reasons.push({cls:'wish',text:'Wishlist'});
+    return{n,score,reasons,lines,trio,links,lb,inCompany:FG.inCompany(n,p)};
+  }).filter(x=>seated.length?x.links>0||x.lb>0:x.score>0)
     .sort((a,b)=>b.score-a.score||(b.inCompany-a.inCompany)||FG.byGameOrder(a.n,b.n)).slice(0,12);
 }
 
@@ -141,7 +152,7 @@ function trioCard(t,i,seated){
   const [a,b,c]=t.names,pairs=[[a,b],[a,c],[b,c]];
   return `<article class="trio" style="--i:${i}">`+
     `<div class="trio-faces" aria-hidden="true">${t.names.map((n,k)=>`<img src="${esc(FG.portrait(n))}" alt="" style="--k:${k}"${seated.includes(n)?' class="seated"':''}>`).join('')}<svg viewBox="0 0 60 52"><path d="M30 6 L6 46 L54 46 Z"/></svg></div>`+
-    `<div class="trio-text"><b>${t.names.map(esc).join(' · ')}</b><span class="trio-tag">Trio · every pair has scenes</span>`+
+    `<div class="trio-text"><b>${t.names.map(esc).join(' · ')}</b><span class="trio-tag">Trio · every pair has scenes</span>${(L=>L?t.names.filter(n=>lordBonus(n,true)).map(n=>`<span class="trio-recruit">Raises ${esc(n)} towards recruiting</span>`).join(''):'')(t.names.includes(store.profile().lord))}`+
     `<ul class="trio-lines">${pairs.map(([x,y])=>{const i=pairInfo(x,y);return `<li class="${i.ready?'ready':i.gate?'later':''}"><span class="tl-names">${esc(x)} &amp; ${esc(y)}</span>${FG.rankPipsHTML(x,y)}<em>${esc(i.ready?`${i.next} ready`:i.gate?`${i.next} · ${i.gate.short}`:`${i.next} at lv. ${i.need}`)}</em></li>`;}).join('')}</ul></div>`+
     `<button type="button" class="seat-trio goldbtn small" data-trio="${esc(t.names.join('|'))}" aria-label="Seat ${esc(t.names.join(', '))}">Seat</button></article>`;
 }
@@ -157,6 +168,7 @@ function renderRecs(){
   $('rec-why').textContent=full?'Remove a guest to see suggestions.':!seated.length?'Seat someone, or pick a trio above. Suggestions rank who still has support scenes with your table — scenes ready to watch first.':
     seated.length===2?`Anyone who still has scenes with both ${seated[0]} and ${seated[1]} completes a trio and comes first.`:
     `Ranked by support scenes still open with ${seated[0]} — ready-to-watch first, then how many are left.`;
+  if(!full&&seated.includes(store.profile().lord))$('rec-why').textContent+=` With ${store.profile().lord} here, anyone still short of their recruit level gets a small boost (a bit more if wishlisted).`;
   $('rec-list').innerHTML=recs.map((x,i)=>
     `<article class="rec${x.trio?' trio-pick':''}" style="--i:${i}"><button type="button" class="rec-open" data-info="${esc(x.n)}" aria-label="${esc(x.n)} field note"><span class="pf sm"><img src="${esc(FG.portrait(x.n))}" alt="" loading="lazy"></span></button>`+
     `<div class="rec-text"><b>${esc(x.n)}${x.inCompany?'':' <small class="guest">Guest</small>'}</b>${x.reasons.length?`<div class="reasons">${x.reasons.map(r=>`<span class="reason ${r.cls}">${esc(r.text)}</span>`).join('')}</div>`:''}`+

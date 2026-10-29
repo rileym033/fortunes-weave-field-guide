@@ -83,7 +83,7 @@ FG.wireSheet=(dialog,closeButton,onClose)=>{
 /* ---------- Data ---------- */
 const D=FG.data={roster:null,supports:null,meals:null,byName:new Map(),pairs:new Map(),partners:new Map()};
 /* Bumped with each data release so phones never pair new code with cached old data. */
-const DATA_V='44';
+const DATA_V='47';
 FG.DATA_V=DATA_V;
 const getJSON=url=>fetch(`${url}?v=${DATA_V}`).then(r=>{if(!r.ok)throw Error(url);return r.json();});
 FG.pairKey=(a,b)=>a<b?`${a}|${b}`:`${b}|${a}`;
@@ -259,6 +259,14 @@ FG.inCompany=(name,p=store.profile())=>name===p.lord||FG.team(p.lord).includes(n
 FG.seen=(a,b)=>store.supports()[FG.pairKey(a,b)]?.seen||[];
 FG.nextRank=(a,b)=>{const pr=FG.pair(a,b);if(!pr)return null;const s=FG.seen(a,b);return pr.ranks.find(r=>!s.includes(r))||null;};
 FG.RANK_LEVEL=RANK_LEVEL;
+/* Numeric support level between any two characters (1–5; every pair starts at 1), shared by every save file. */
+FG.levelWith=(a,b)=>store.supports()[FG.pairKey(a,b)]?.level??1;
+/* Recruitment on this save file's path: the support level still needed with the lord (null = not a recruit target). */
+FG.recruitLevel=(name,p=store.profile())=>{
+  if(!D.byName.has(name)||FG.inCompany(name,p)||!FG.canJoin(name,p.lord))return null;
+  const need=FG.routeOf(name,p.lord)?.support;if(need==null)return null;
+  const lv=FG.levelWith(p.lord,name);return{need,lv,met:lv>=need,short:Math.max(0,need-lv)};
+};
 /* Some conversations list their own support level; otherwise C/B/A open at 2/3/4. */
 FG.rankLevel=(pr,r)=>pr?.levels?.[r]||RANK_LEVEL[r];
 FG.ready=Promise.all([getJSON('data/roster.json'),getJSON('data/supports.json')]).then(([roster,supports])=>{
@@ -295,6 +303,8 @@ function filterGroups(){
     {id:'marks',label:'Your marks',opts:[['wishlist','Wishlist'],['recruited','Recruited']],test:(c,k)=>store.profile()[k].includes(c.name)},
     {id:'partner',label:`Supports with ${lord}’s team`,opts:[...teamAll.map(n=>[n,n,true]),['none','No team supports listed']],
       test:(c,k)=>k==='none'?!teamAll.some(n=>n!==c.name&&FG.pair(c.name,n)):c.name!==k&&!!FG.pair(c.name,k)},
+    {id:'level',label:`Support level with ${lord}`,opts:[['met','Recruit level reached'],['below','Still below it']],
+      test:(c,k)=>{const r=FG.recruitLevel(c.name);return !!r&&(k==='met'?r.met:!r.met);}},
     {id:'needs',label:'Requirements',opts:[['items','Needs items'],['gold','Needs gold'],['extra','Extra conditions']],
       test:(c,k)=>{const rt=FG.routeOf(c.name);return k==='items'?hasItems(rt):k==='gold'?hasGold(rt):hasExtra(rt);}}
   ];
@@ -381,6 +391,12 @@ function teamChips(name){
   return chips.length?chips.join(''):'<span class="unknown">No team supports listed</span>';
 }
 const sealBadge='<span class="seal-badge" aria-hidden="true"><svg class="ico"><use href="#i-seal"/></svg></span>';
+/* Your current level with the lord, beside the level recruiting needs: a check once reached, "now 2" while below. */
+function lvNow(name){
+  const r=FG.recruitLevel(name);if(!r)return '';
+  if(r.met)return `<i class="lv-now met" aria-label="reached">✓</i>`;
+  return r.lv>1?`<i class="lv-now" aria-label="you’re at ${r.lv}">now ${r.lv}</i>`:'';
+}
 function cardFlags(name){
   const rec=FG.recommendation(name),on=FG.recommendOn()&&rec.recommended;
   if(!rec.unseen&&!on)return '';
@@ -401,7 +417,7 @@ function cardHTML(c,i){
       `<span class="pf"><img src="${esc(c.portrait)}" alt="" width="68" height="82" loading="lazy" decoding="async">${recruited?sealBadge:''}</span>`+
       `<span class="cardtext"><span class="card-name">${esc(c.name)}</span><span class="status ${STATUS_CLASS[sk]}">${STATUS_LABEL[sk]}</span>${recruited?'<span class="recruited-mark"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Recruited</span>':''}`+
       cardFlags(c.name)+
-      `<span class="numbers"><span>Support lv.<b>${rt?.support??'—'}</b></span><span>Renown<b>${rt?.renown??'—'}</b></span></span></span>`+
+      `<span class="numbers"><span>Support lv.<b>${rt?.support??'—'}</b>${lvNow(c.name)}</span><span>Renown<b>${rt?.renown??'—'}</b></span></span></span>`+
     `</button>`+
     `<button class="star" aria-label="Wishlist ${esc(c.name)}" aria-pressed="${wished}"><svg class="ico" aria-hidden="true"><use href="#i-star"/></svg></button>`+
     `<div class="chips">${teamChips(c.name)}</div></article>`;
@@ -543,6 +559,7 @@ function setSelecting(on){
 }
 FG.setSelecting=setSelecting;
 $('select-toggle').addEventListener('click',()=>setSelecting(!selecting));
+$('levels-company').addEventListener('click',e=>FG.openLevels(FG.lord(),'recruit',e.currentTarget));
 $('bulk-done').addEventListener('click',()=>{setSelecting(false);$('select-toggle').focus();});
 $('bulk-all').addEventListener('click',()=>{
   const shown=filtered(),all=shown.length&&shown.every(c=>selected.has(c.name));
@@ -596,13 +613,21 @@ function stepMet(t){
   if(para){const tag=`-paralogue-${para[1].toLowerCase().replace(/\s+/g,'-')}"`;return store.viewed().some(k=>k.includes(tag))?'cleared':'';}
   return '';
 }
+function levelBox(name,lord,rt){
+  const lv=FG.levelWith(lord,name),need=FG.canJoin(name,lord)&&rt?.support!=null&&!FG.inCompany(name)?rt.support:null,max=D.supports?.viewing?.maxLevel||5;
+  const sub=need==null?`Copy it from the game’s support screen.`:lv>=need?`<span class="lv-ok">✓ Enough to recruit (needs ${need})</span>`:`Needs ${need} to recruit · ${need-lv} to go`;
+  return `<div class="level-box rec-level${need!=null&&lv>=need?' met':''}"><div><b>Your support level with ${esc(lord)}</b><small>${sub}</small></div>`+
+    `<div class="stepper" role="group" aria-label="Support level with ${esc(lord)}"><button type="button" class="mini" data-dlv="-1" aria-label="Lower level"${lv<=1?' disabled':''}><svg class="ico" aria-hidden="true"><use href="#i-minus"/></svg></button>`+
+    `<output id="detail-level" aria-live="polite">${lv}</output><button type="button" class="mini" data-dlv="1" aria-label="Raise level"${lv>=max?' disabled':''}><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg></button></div></div>`;
+}
 function recruitSteps(rt,sk){
   if(sk==='sealed')return '<span class="unknown">Sealed until later in your journey — nothing here hints at what’s ahead.</span>';
   if(!rt||sk==='no')return '<span class="unknown">Not recruitable on this route.</span>';
   const steps=rt.steps||[];
   if((sk==='auto'||sk==='prologue')&&!steps.length)return 'Joins automatically.';
   /* Levels only matter when the guide lists them (later recruits usually join without them). */
-  const base=rt.support!=null||rt.renown!=null?`<li class="step-base">Reach support level <b>${rt.support??'—'}</b> with ${esc(FG.lord())} and renown <b>${rt.renown??'—'}</b></li>`:'';
+  const lvNowStep=rt.support!=null?(r=>r>=rt.support?`<span class="met-tag"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>level reached</span>`:r>1?` <span class="lv-now">now ${r}</span>`:'')(FG.levelWith(FG.lord(),activeName)):'';
+  const base=rt.support!=null||rt.renown!=null?`<li class="step-base">Reach support level <b>${rt.support??'—'}</b> with ${esc(FG.lord())} and renown <b>${rt.renown??'—'}</b>${lvNowStep}</li>`:'';
   return `<ol class="steps">${base}${steps.map(t=>{const met=stepMet(t);return `<li${met?' class="met"':''}>${esc(t)}${met?`<span class="met-tag"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>${esc(met)}</span>`:''}</li>`;}).join('')}</ol>`+(steps.length||!base?'':'<p class="note">No extra steps listed — the levels above are enough.</p>');
 }
 function showDetail(name,open=true){
@@ -612,6 +637,7 @@ function showDetail(name,open=true){
   $('detail-content').innerHTML=
     `<div class="detailhero"><span class="pf"><img src="${esc(c.portrait)}" alt="${esc(name)} portrait">${recruited?sealBadge:''}</span><div><h2 id="detail-name">${esc(name)}</h2><span class="status ${STATUS_CLASS[sk]}">${STATUS_LABEL[sk]}</span><p class="route-note">On ${esc(p.lord)}’s route</p></div></div>`+
     `<div class="medallions"><div class="medal"><b>${rt?.support??'—'}</b><span>Support lv. with ${esc(p.lord)}</span></div><div class="medal"><b>${rt?.renown??'—'}</b><span>Required renown</span></div></div>`+
+    levelBox(name,p.lord,rt)+
     (rt?.certainty==='conflict'?'<p class="warning">Guides disagree on part of this requirement — double-check in game.</p>':'')+
     `<dl class="facts">`+(rt?.window||rt?.chapter?`<dt><svg class="ico" aria-hidden="true"><use href="#i-clock"/></svg>When</dt><dd>${esc(rt.window||`From Chapter ${rt.chapter}`)}</dd>`:'')+
     (rt?.find?`<dt><svg class="ico" aria-hidden="true"><use href="#i-pin"/></svg>Where</dt><dd>${esc(rt.find)}</dd>`:'')+
@@ -627,6 +653,13 @@ function showDetail(name,open=true){
     `<button id="detail-recruited" class="${recruited?'ghostbtn':'goldbtn'}" aria-pressed="${recruited}">${recruited?'✓ Recruited':'Mark recruited'}</button></div>`;
   $('detail-wishlist').onclick=()=>{if(store.toggle('wishlist',name))FG.toast(`${name} added to wishlist`);};
   $('detail-recruited').onclick=()=>{if(store.toggle('recruited',name))FG.toast(`${name} joined the company`);};
+  $('detail-content').querySelectorAll('[data-dlv]').forEach(b=>b.onclick=()=>{
+    const lord=store.profile().lord,max=D.supports?.viewing?.maxLevel||5,was=FG.recruitLevel(name);
+    const next=Math.max(1,Math.min(max,FG.levelWith(lord,name)+ +b.dataset.dlv));
+    FG.setSupportLevel(lord,name,next);FG.haptic?.();
+    const now=FG.recruitLevel(name);if(was&&!was.met&&now?.met){FG.toast(`${name}: recruit level reached`);FG.burst($('detail-content').querySelector('.rec-level output'));}
+    const again=$('detail-content').querySelector(`[data-dlv="${b.dataset.dlv}"]`);(again&&!again.disabled?again:$('detail-content').querySelector('[data-dlv]:not([disabled])'))?.focus();
+  });
   $('detail-content').querySelectorAll('[data-pair]').forEach(b=>b.onclick=()=>{const [a,x]=b.dataset.pair.split('|');FG.openPair?.(a,x);});
   if(open){
     FG.openSheet($('detail'));
