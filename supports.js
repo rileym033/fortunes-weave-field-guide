@@ -177,7 +177,11 @@ $('sp-focus').addEventListener('click',()=>{
     name=>{setFocus(name);window.scrollTo({top:0,behavior:'auto'});});
 });
 
-/* ---------- Set levels: every partner of the focused character on one sheet ---------- */
+/* ---------- Levels sheet: support levels between one character and anyone ----------
+   Every pair has a numeric support level (1–5) in the game, even without conversations; recruitment checks the level
+   with your lord. Views (lords only): partners with scenes · people you can still recruit · everyone. */
+let lvFocus=null,lvView='scenes',lvReturn=null;
+const LV_VIEWS=[['scenes','Scenes'],['recruit','To recruit'],['all','Everyone']];
 function gaugeHTML(lv,label,command=false){
   const max=MAX_LEVEL();let h=`<div class="lv-gauge" role="${command?'group':'radiogroup'}" aria-label="${esc(label)}">`;
   for(let n=1;n<=max;n++){const mark=Object.entries(FG.RANK_LEVEL).find(([,v])=>v===n)?.[0],tag=mark?` (${mark})`:'';
@@ -185,38 +189,72 @@ function gaugeHTML(lv,label,command=false){
       :`<button type="button" role="radio" data-set="${n}" aria-checked="${n===lv}" tabindex="${n===lv?0:-1}" aria-label="Level ${n}${tag}" class="${n<=lv?'on':''}${n===lv?' top':''}" style="--n:${n}"><b>${n}</b>${mark?`<small>${mark}</small>`:''}</button>`;}
   return h+'</div>';
 }
+/* What recruiting n still needs from this save file's lord (null if not a recruit target here). */
+function recruitNeed(n){
+  if(lvFocus!==FG.lord()||!FG.data.byName.has(n)||FG.inCompany(n))return null;
+  const rt=FG.routeOf(n);
+  return FG.canJoin(n)&&rt?.support!=null?rt.support:null;
+}
+function lvList(){
+  const all=FG.everyone().filter(n=>n!==lvFocus);
+  if(lvView==='scenes'||!FG.isLord(lvFocus))return(D.partners.get(lvFocus)||[]).slice().filter(n=>!companyOnly||FG.inCompany(n));
+  if(lvView==='recruit')return all.filter(n=>recruitNeed(n)!=null);
+  return all;
+}
 function levelRow(n){
-  const st=statusLine(focus,n);
+  const lv=levelOf(lvFocus,n),need=recruitNeed(n),pr=FG.pair(lvFocus,n);
+  const st=pr?statusLine(lvFocus,n):null;
+  const lines=[];
+  if(need!=null)lines.push(lv>=need?`<small class="st lv-ok">✓ Recruit level ${need} reached</small>`:`<small class="st lv-need">Recruit at lv. ${need}</small>`);
+  else if(lvFocus===FG.lord()&&FG.inCompany(n)&&!FG.isLord(n))lines.push('<small class="st muted">In your company</small>');
+  if(st)lines.push(`<small class="st ${st.cls}">${esc(st.text)}</small>`);
+  if(!lines.length)lines.push('<small class="st muted">No support scenes</small>');
   return `<div class="lv-row" data-partner="${esc(n)}"><span class="pf sm"><img src="${esc(FG.portrait(n))}" alt="" loading="lazy"></span>`+
-    `<span><b class="lv-name">${esc(n)}</b><small class="st ${st.cls}">${esc(st.text)}</small></span>${gaugeHTML(levelOf(focus,n),`Support level with ${n}`)}</div>`;
+    `<span><b class="lv-name">${esc(n)}</b>${lines.join('')}</span>${gaugeHTML(lv,`Support level between ${lvFocus} and ${n}`)}</div>`;
 }
 function renderLevels(){
-  const partners=(D.partners.get(focus)||[]).slice().filter(n=>!companyOnly||FG.inCompany(n));
+  const lord=FG.isLord(lvFocus),list=lvList();
+  const counts=lord?Object.fromEntries(LV_VIEWS.map(([k])=>{const keep=lvView;lvView=k;const c=lvList().length;lvView=keep;return[k,c];})):null;
+  const note=lvView==='recruit'?`Recruiting needs this support level with ${esc(lvFocus)} (plus renown). Copy the numbers from the game’s support screen.`:
+    lvView==='all'?`Every pair has a support level, even without scenes. Copy the numbers from the game’s support screen.`:
+    'Copy the numbers from the game’s support screen. C, B and A usually open at levels 2, 3 and 4.';
   $('levels-content').innerHTML=
-    `<div class="levels-head"><span class="pf sm"><img src="${esc(FG.portrait(focus))}" alt=""></span><h2 id="levels-title">${esc(focus)}’s levels</h2></div>`+
-    `<p class="note">Copy the numbers from the game’s support screen. C, B and A usually open at levels 2, 3 and 4.</p>`+
-    `<div class="levels-all"><span>Set everyone below to</span>${gaugeHTML(0,'Set every level below',true)}</div>`+
-    (partners.length?partners.map(levelRow).join(''):`<p class="unknown">No partners to show${companyOnly?' in your company':''}.</p>`);
+    `<div class="levels-head"><span class="pf sm"><img src="${esc(FG.portrait(lvFocus))}" alt=""></span><h2 id="levels-title">${esc(lvFocus)}’s levels</h2></div>`+
+    (lord?`<div class="lv-views segmented wide" role="group" aria-label="Show">${LV_VIEWS.map(([k,l])=>`<button type="button" data-lvview="${k}" aria-pressed="${k===lvView}">${l}<b>${counts[k]}</b></button>`).join('')}</div>`:'')+
+    `<p class="note">${note}</p>`+
+    (list.length?`<div class="levels-all"><span>Set everyone below to</span>${gaugeHTML(0,'Set every level below',true)}</div>`+list.map(levelRow).join('')
+      :`<p class="unknown">${lvView==='recruit'?`Nobody left to recruit on ${esc(lvFocus)}’s path right now.`:`No one to show${companyOnly&&lvView==='scenes'?' in your company':''}.`}</p>`);
 }
 function writeLevels(pairs){
   store.updateSupports(sup=>{
     pairs.forEach(([a,b,level])=>{const key=FG.pairKey(a,b),cur=sup[key]||{seen:[],level:null};cur.level=level>1?level:null;if(cur.seen.length||cur.level!==null)sup[key]=cur;else delete sup[key];});
   });
 }
+FG.setSupportLevel=(a,b,level)=>writeLevels([[a,b,level]]);
+FG.openLevels=(who,view,returnEl)=>{
+  lvFocus=who;lvReturn=returnEl||document.activeElement;
+  lvView=FG.isLord(who)?(view||FG.prefs.get('levelsView')||'scenes'):'scenes';
+  renderLevels();FG.openSheet($('levels'));
+};
 $('levels-content').addEventListener('click',e=>{
+  const v=e.target.closest('[data-lvview]');
+  if(v){lvView=v.dataset.lvview;FG.prefs.set('levelsView',lvView);renderLevels();$('levels-content').querySelector(`[data-lvview="${lvView}"]`)?.focus();FG.haptic?.();return;}
   const b=e.target.closest('[data-set]');if(!b)return;
   const n=+b.dataset.set,row=b.closest('.lv-row');
   if(row){
-    const partner=row.dataset.partner,wasReady=isReady(focus,partner);
-    writeLevels([[focus,partner,n]]);
+    const partner=row.dataset.partner,need=recruitNeed(partner);
+    const wasReady=FG.pair(lvFocus,partner)&&isReady(lvFocus,partner),wasMet=need!=null&&levelOf(lvFocus,partner)>=need;
+    writeLevels([[lvFocus,partner,n]]);
     row.outerHTML=levelRow(partner);
     const fresh=$('levels-content').querySelector(`.lv-row[data-partner="${CSS.escape(partner)}"]`);
     fresh?.querySelector(`[data-set="${n}"]`)?.focus();
-    if(!wasReady&&isReady(focus,partner)&&fresh&&!calm()){fresh.classList.add('flash');FG.burst(fresh.querySelector('.lv-gauge .top'));}
+    const nowReady=FG.pair(lvFocus,partner)&&isReady(lvFocus,partner),nowMet=need!=null&&n>=need;
+    if(((!wasReady&&nowReady)||(!wasMet&&nowMet))&&fresh&&!calm()){fresh.classList.add('flash');FG.burst(fresh.querySelector('.lv-gauge .top'));}
+    if(!wasMet&&nowMet)FG.toast(`${partner}: recruit level reached`);
     FG.haptic?.();
   }else{
     const partners=[...$('levels-content').querySelectorAll('.lv-row')].map(r=>r.dataset.partner);
-    writeLevels(partners.map(p=>[focus,p,n]));renderLevels();
+    writeLevels(partners.map(p=>[lvFocus,p,n]));renderLevels();
     if(!calm())$('levels-content').querySelectorAll('.lv-row').forEach((r,i)=>{r.style.animationDelay=`${i*25}ms`;r.classList.add('flash');});
     FG.haptic?.('success');FG.toast(`${partners.length} levels set to ${n}`);
     $('levels-content').querySelector('.levels-all [data-set]')?.focus();
@@ -230,8 +268,11 @@ $('levels-content').addEventListener('keydown',e=>{
   const t=Math.max(1,Math.min(max,to)),target=b.parentElement.querySelector(`[data-set="${t}"]`);
   if(row)target?.click();else target?.focus();      /* radios select as they move; the bulk row only moves focus */
 });
-$('sp-levels').addEventListener('click',()=>{renderLevels();FG.openSheet($('levels'));});
-FG.wireSheet($('levels'),$('close-levels'),()=>{if(FG.currentTab()==='supports')render();$('sp-levels').focus({preventScroll:true});});
+$('sp-levels').addEventListener('click',e=>FG.openLevels(focus,undefined,e.currentTarget));
+FG.wireSheet($('levels'),$('close-levels'),()=>{
+  if(FG.currentTab()==='supports')render();
+  const el=lvReturn&&document.contains(lvReturn)?lvReturn:$('sp-levels');el?.focus({preventScroll:true});
+});
 
 /* ---------- Pair sheet ---------- */
 function openPair(a,b,returnTo){if(!FG.revealed(a)||!FG.revealed(b))return;pairA=a;pairB=b;const el=document.activeElement;pairReturn=returnTo||(()=>el);renderPair();FG.openSheet($('pair'));}
@@ -289,7 +330,7 @@ FG.onProfileChange.push(()=>{
   if(FG.currentTab()==='supports'){render();paintCast(true);}
   if(pairA&&(!FG.revealed(pairA)||!FG.revealed(pairB))){FG.closeSheet($('pair'));$('pair-content').innerHTML='';pairA=pairB=null;}
   else if($('pair').open)renderPair();
-  if($('levels').open){if(FG.revealed(focus))renderLevels();else FG.closeSheet($('levels'));}
+  if($('levels').open){if(lvFocus&&FG.revealed(lvFocus))renderLevels();else FG.closeSheet($('levels'));}
 });
 FG.ready.then(()=>{lastLord=FG.lord();});
 })();
